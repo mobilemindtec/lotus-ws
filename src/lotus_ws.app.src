@@ -1,0 +1,15 @@
+%% -*- erlang -*-
+{application, lotus_ws,
+  [{description, "Rest framework built on top of cowboy"},
+   {vsn, "0.1"},
+   {modules, [lotus_ws_html,
+              lotus_ws_handler,
+              lotus_ws_router,
+              rooster_json,
+              lotus_ws_http_utils,
+              lotus_ws_utils,
+              lotus_ws_validation]},
+   {registered, []},
+   {mod, {'lotus_ws_app', []}},
+   {env, []},
+   {applications, [kernel, stdlib, crypto, cowboy]}]}.

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<testsuite tests="9" failures="0" errors="0" skipped="0" time="0.027" name="module 'lotus_ws_router_test'">
+  <testcase time="0.000" name="lotus_ws_router_test:0 route_sub1_test">
+    <system-out>
+    </system-out>
+  </testcase>
+  <testcase time="0.000" name="lotus_ws_router_test:0 route_sub2_test">
+    <system-out>
+    </system-out>
+  </testcase>
+  <testcase time="0.000" name="lotus_ws_router_test:0 route_sub3_test">
+    <system-out>
+    </system-out>
+  </testcase>
+  <testcase time="0.000" name="lotus_ws_router_test:0 route_sub4_test">
+    <system-out>
+    </system-out>
+  </testcase>
+  <testcase time="0.000" name="lotus_ws_router_test:0 route2_sub4_test">
+    <system-out>
+    </system-out>
+  </testcase>
+  <testcase time="0.000" name="lotus_ws_router_test:0 route_handlers_test">
+    <system-out>
+    </system-out>
+  </testcase>
+  <testcase time="0.000" name="lotus_ws_router_test:0 route_regexp_id_test">
+    <system-out>
+    </system-out>
+  </testcase>
+  <testcase time="0.000" name="lotus_ws_router_test:0 route_regexp_id_limit_offset_test">
+    <system-out>
+    </system-out>
+  </testcase>
+  <testcase time="0.000" name="lotus_ws_router_test:0 route_with_defaults_test">
+    <system-out>
+    </system-out>
+  </testcase>
+</testsuite>

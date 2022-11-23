@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<testsuite tests="2" failures="0" errors="2" skipped="0" time="0.025" name="module 'lotus_ws_handler_test'">
+  <testcase time="0.019" name="lotus_ws_handler_test:0 default_handler_test">
+    <error type="error">
+::in function lotus_ws_handler:process_ctx/2
+  called as process_ctx({ctx,{req,&lt;&lt;"{\"username\":[116,101,115,116],\"password\""...&gt;&gt;,"/login",
+          &lt;&lt;"POST"&gt;&gt;,
+          #{&lt;&lt;"content-type"&gt;&gt; =&gt; &lt;&lt;"application/json"&gt;&gt;},
+          #{},#{},undefined},
+     undefined,false,undefined,#{},undefined,undefined},{router,[{route,bearer_token,"/login",undefined,undefined,dummy_handler,
+                {middlewares,[],[],[...]},
+                [],#{},[],[]}],
+        [],undefined,false})
+in call from lotus_ws_handler_test:default_handler_test/0 (/mnt/data/sources/erlang/lotus-ws/test/lotus_ws_handler_test.erl, line 39)
+in call from lotus_ws_handler_test:default_handler_test/0
+**error:undef
+    </error>
+    <system-out>
+    </system-out>
+  </testcase>
+  <testcase time="0.000" name="lotus_ws_handler_test:0 default_handler_auth_test">
+    <error type="error">
+::in function lotus_ws_handler:from_ctx/2
+  called as from_ctx({ctx,{req,&lt;&lt;"{\"username\":[116,101,115,116],\"password\""...&gt;&gt;,"/login",
+          &lt;&lt;"POST"&gt;&gt;,
+          #{&lt;&lt;"content-type"&gt;&gt; =&gt; &lt;&lt;"application/json"&gt;&gt;},
+          #{},#{},undefined},
+     undefined,false,undefined,#{},undefined,undefined},{router,[{route,undefined,"/",undefined,undefined,undefined,
+                {middlewares,[],[],[]},
+                [],#{},
+                [{...}],
+                [...]}],
+        [],#Fun&lt;lotus_ws_handler_test.1.87268709&gt;,false})
+in call from lotus_ws_handler_test:default_handler_auth_test/0 (/mnt/data/sources/erlang/lotus-ws/test/lotus_ws_handler_test.erl, line 68)
+in call from lotus_ws_handler_test:default_handler_auth_test/0
+**error:undef
+    </error>
+    <system-out>
+    </system-out>
+  </testcase>
+</testsuite>
