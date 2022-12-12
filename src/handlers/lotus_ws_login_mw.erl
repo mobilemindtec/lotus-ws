@@ -1,4 +1,4 @@
--module(lotus_login_mw).
+-module(lotus_ws_login_mw).
 
 -include("include/lotus_ws.hrl").
 

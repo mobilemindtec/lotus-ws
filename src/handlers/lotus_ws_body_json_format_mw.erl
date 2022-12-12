@@ -1,4 +1,4 @@
--module(lotus_body_json_format_mw).
+-module(lotus_ws_body_json_format_mw).
 
 -include("include/lotus_ws.hrl").
 

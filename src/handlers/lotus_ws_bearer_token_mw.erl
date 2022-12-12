@@ -1,4 +1,4 @@
--module(lotus_bearer_token_mw).
+-module(lotus_ws_bearer_token_mw).
 
 -include("include/lotus_ws.hrl").
 
@@ -24,7 +24,7 @@ get_config(Key, List) ->
 
 enter(#ctx{ auth = Auth, req = #req { body = #login{ username = Username } }}) -> 
 	%?debugMsg("enter"),
-	Configs = lotus_utils:get_env(bearer_token, default_configs()),
+	Configs = lotus_ws_utils:get_env(bearer_token, default_configs()),
 	Key = get_config(key, Configs),
 	Exp = get_config(exp, Configs),
 	Alg = get_config(alg, Configs),

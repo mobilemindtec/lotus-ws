@@ -1,4 +1,4 @@
--module(lotus_bearer_token_auth_mw).
+-module(lotus_ws_bearer_token_auth_mw).
 
 -include("include/lotus_ws.hrl").
 
@@ -38,13 +38,13 @@ validate_roles([], undefined) -> false;
 validate_roles([], _) -> true;
 validate_roles(_, #auth{ roles = [] }) -> false;
 validate_roles(RouteRoles, #auth{ roles = AuthRoles }) -> 
-	lotus_utils:list_in_list_any(fun(X, Y) -> X =:= Y end, AuthRoles, RouteRoles).	
+	lotus_ws_utils:list_in_list_any(fun(X, Y) -> X =:= Y end, AuthRoles, RouteRoles).	
 
 auth_finish(Ctx, Auth, true) -> Ctx#ctx { auth = Auth };
 auth_finish(_, _, false) -> unauthorized().
 
 enter(#ctx{ route = Route, req = #req { headers = Headers }} = Ctx) -> 
-	Configs = lotus_utils:get_env(bearer_token, default_configs()),
+	Configs = lotus_ws_utils:get_env(bearer_token, default_configs()),
 	Key = get_config(key, Configs),
 	Token = parse_token(maps:get(<<"authorization">>, Headers, undefined)),
 	Claims = decode_token(Token, Key),

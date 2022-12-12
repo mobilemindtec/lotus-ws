@@ -16,9 +16,9 @@
 -spec init(Req, any()) -> Req when Req :: cowboy_req:req().
 
 init(Req, State) ->
-	ctx = create_ctx(Req),
-	Newctx = run_ctx(ctx),
-	{ok, lotus_ws_http_utils:cowboy_response(Newctx, Req), State}.
+	Ctx = create_ctx(Req),
+	Newctx = run_ctx(Ctx),
+	{ok, lotus_ws_http_utils:cowboy_resp(Newctx, Req), State}.
 
 
 create_ctx(#{path := Path, method := Method, headers := Headers} = Req) ->	

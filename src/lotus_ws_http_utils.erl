@@ -72,6 +72,18 @@ bad_req(html, ErrorDetail) ->
 
 bad_req(_, _) -> 400.	
 
+handle_resp(#ctx{} = Ctx, {ok, Any}) ->
+	handle_resp(Ctx, {200, Any});
+
+handle_resp(#ctx{} = Ctx, {not_found, Any}) ->
+	handle_resp(Ctx, {404, Any});
+
+handle_resp(#ctx{} = Ctx, {server_error, Any}) ->
+	handle_resp(Ctx, {500, Any});
+
+handle_resp(#ctx{} = Ctx, {bad_request, Any}) ->
+	handle_resp(Ctx, {400, Any});
+
 handle_resp(#ctx{} = Ctx, {200, [{text, ResponseBody}]}) ->
 	Ctx#ctx { resp = #resp { status = 200, body = ResponseBody, headers = ?CONTENT_TYPE_TEXT }};
 
@@ -122,7 +134,6 @@ cowboy_resp(#ctx{ resp = #resp { status = Status, headers = Headers, body = Body
 	cowboy_req:reply(Status, Headers, Body, Req);
 
 cowboy_resp(#ctx{ resp = undefined, error = true}, Req) ->
-	lager:info("ctx error, resp not  found"),
 	cowboy_req:reply(500, ?CONTENT_TYPE_TEXT, "Server Error", Req).
 
 get_cowboy_req_body(Req) ->

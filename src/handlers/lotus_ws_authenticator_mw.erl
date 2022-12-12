@@ -1,4 +1,4 @@
--module(lotus_authenticator_mw).
+-module(lotus_ws_authenticator_mw).
 
 -include("include/lotus_ws.hrl").
 
@@ -24,7 +24,7 @@ call_authenticator(_, _, _, _) -> server_error().
 call_authenticator(Ctx, true, Authenticator) -> 
 	call_authenticator(Ctx, erlang:fun_info(Authenticator, arity), undefined, Authenticator);
 call_authenticator(Ctx, false, Authenticator) -> 
-	call_authenticator(Ctx, lotus_utils:find_module_fn(Authenticator, authenticate), Authenticator, authenticate).
+	call_authenticator(Ctx, lotus_ws_utils:find_module_fn(Authenticator, authenticate), Authenticator, authenticate).
 
 enter(#ctx{ authenticator = undefined } = Ctx) -> Ctx;
 

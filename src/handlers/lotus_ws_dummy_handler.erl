@@ -1,4 +1,4 @@
--module(lotus_dummy_handler).
+-module(lotus_ws_dummy_handler).
 
 -export([
 	get/2,
