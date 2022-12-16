@@ -11,14 +11,14 @@ server_error() -> {500, [{auto, [{message, <<"wrong auth callback">>}]}]}.
 
 call_authenticator(#ctx{} = Ctx, {arity, 1}, undefined, AuthFn) -> 
 	apply(AuthFn, [Ctx]);
-call_authenticator(#ctx{ req = #req { body = UserNamePassword }} = Ctx, {arity, 2}, undefined, AuthFn) -> 
-	apply(AuthFn, [Ctx, UserNamePassword]);
+call_authenticator(#ctx{ req = #req { body = Login }} = Ctx, {arity, 2}, undefined, AuthFn) ->
+	apply(AuthFn, [Ctx, Login]);
 call_authenticator(_, _, undefined, _) -> server_error();
 
 call_authenticator(#ctx{} = Ctx, {arity, 1}, Module, AuthFn) ->
 	apply(Module, AuthFn, [Ctx]);		
-call_authenticator(#ctx{ req = #req { body = UserNamePassword }} = Ctx, {arity, 2}, Module, AuthFn) ->
- apply(Module, AuthFn, [Ctx, UserNamePassword]);
+call_authenticator(#ctx{ req = #req { body = Login }} = Ctx, {arity, 2}, Module, AuthFn) ->
+ apply(Module, AuthFn, [Ctx, Login]);
 call_authenticator(_, _, _, _) -> server_error().
 
 call_authenticator(Ctx, true, Authenticator) -> 

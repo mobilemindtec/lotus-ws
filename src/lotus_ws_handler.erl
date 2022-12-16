@@ -2,7 +2,7 @@
 
 -behaviour(cowboy_handler).
 
--include("include/lotus_ws.hrl").
+-include("../include/lotus_ws.hrl").
 
 -export([
 	init/2
@@ -42,10 +42,10 @@ run_ctx(#ctx{ req = Req } = Ctx) ->
 		Route=#route{} ->
 
 			lager:info("route found: ~p", [Route#route.path]),
-			
+
 			Middlewares = get_route_middlewares(Route),
 			RouteCtx = Ctx#ctx{ route = Route
-												, req = Req#req{ params = Route#route.params } },	
+												, req = Req#req{ params = Route#route.params } },
 			EnterCtx = dispatch_middwares(Middlewares, RouteCtx, enter),
 
 			case EnterCtx of
@@ -61,8 +61,8 @@ run_ctx(#ctx{ req = Req } = Ctx) ->
 							dispatch_middwares(Middlewares, RespCtx, NextAction)
 						catch
 							Throw -> 
-								lager:info("Throw = ~p", [Throw]),
-								lotus_ws_http_utils:new_ctx_error(EnterCtx, fmt:sprint("$reason", [{reason, Throw}]))								
+								lager:error("Throw = ~p", [Throw]),
+								lotus_ws_http_utils:new_ctx_error(EnterCtx, lotus_ws_utils:sprint("$reason", [{reason, Throw}]))
 					end
 			end;
 
@@ -89,7 +89,7 @@ dispatch(Method, #route{} = Route, #ctx { req = #req{ body = Body, headers = Hea
 		{Fn, ArityCount } ->
 			dispatch_apply_with_body(Module, Fn, ArityCount, [Route#route.compiled_path, Ctx, Req, Body], Headers);
 		false ->
-			lotus_ws_http_utils:server_error(Headers, fmt:sprint("action to $method not found", [{method, Method}]))
+			lotus_ws_http_utils:server_error(Headers, lotus_ws_utils:sprint("action $method not found", [{method, Method}]))
 	end.	
 
 
@@ -133,7 +133,7 @@ get_route_middlewares(#route { middlewares = Handlers }  = Route) when is_list(H
 get_route_middlewares(#route { middlewares = #middlewares{ values = Values, handlers = Handlers } }) ->
 	Middlewares = lotus_ws_router:get_middlewares(),
 	CustomHandlers = lists:map(fun(H) -> #middleware{ handler = H } end, Handlers),
-	lotus_ws_utils:list_in_list(fun(X, Y) -> X#middleware.name =:= Y end, Middlewares, Values) ++ CustomHandlers.
+	lotus_ws_utils:list_in_list(fun(X, Y) -> X#middleware.name =:= Y end, Middlewares#middlewares.handlers, Values) ++ CustomHandlers.
 
 dispatch_apply_without_body(undefined, Fn, 1, [Arg1|_], _) -> apply(Fn, [Arg1]);
 dispatch_apply_without_body(Module, Fn, 1, [Arg1|_], _) -> apply(Module, Fn, [Arg1]);

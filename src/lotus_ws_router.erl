@@ -1,7 +1,7 @@
 -module(lotus_ws_router).
 
 -behaviour(gen_server).
--include("include/lotus_ws.hrl").
+-include("../include/lotus_ws.hrl").
 
 -export([
 	start/1,
@@ -26,6 +26,70 @@ start(Router) ->
 start_link(Router) ->
 	application:ensure_all_started(jwt),
 	gen_server:start_link({global, ?MODULE}, ?MODULE, Router, []).
+
+map_route_to_record(R) ->
+  Handler = maps:get(handler, R, undefined),
+  Middlewares = maps:get(middlewares, R, []),
+  #route{
+    name = maps:get(name, R, Handler),
+    path = maps:get(path, R, undefined),
+    fn =  maps:get(fn, R, undefined),
+    handler = Handler,
+    middlewares = extract_middlewares(Middlewares),
+    roles = maps:get(rolesfn, R, []),
+    routes = map_routes_to_record(maps:get(routes, R, [])),
+    defaults = maps:get(defaults, R, [])
+  }.
+
+extract_middlewares(Middlewares) when is_map(Middlewares) ->
+  #middlewares{
+    values = maps:get(values, Middlewares, []),
+    bypass = maps:get(bypass, Middlewares, []),
+    handlers = [map_middleware_to_record(X) || X <- maps:get(handlers, Middlewares, [])]
+  };
+extract_middlewares(Middlewares) when is_list(Middlewares) ->
+  [map_middleware_to_record(X) || X <- Middlewares].
+
+map_routes_to_record(Routes) -> map_routes_to_record(Routes, []).
+map_routes_to_record([], Results) -> Results;
+map_routes_to_record([H| T], Results) ->
+  map_routes_to_record(T, Results++[map_route_to_record(H)]).
+
+map_middleware_to_record(Middleware) when is_atom(Middleware) ->
+  Middleware;
+map_middleware_to_record(Middleware) when is_map(Middleware) ->
+  Handler = maps:get(handler, Middleware, undefined),
+  #middleware{
+    name = maps:get(name, Middleware, Handler),
+    description = maps:get(description, Middleware, ""),
+    enter = maps:get(enter, Middleware, undefined),
+    leave = maps:get(leave, Middleware, undefined),
+    error = maps:get(error, Middleware, undefined),
+    handler = Handler
+  }.
+
+map_middlewares_to_record(Middlewares) ->
+  #middlewares{
+    values = maps:get(values, Middlewares, []),
+    bypass = maps:get(bypass, Middlewares, []),
+    handlers = maps:get(handlers, Middlewares, [])
+  }.
+
+map_router_to_record(Router) when is_map(Router) ->
+  Routes = maps:get(routes, Router, []),
+  Debug = maps:get(debug, Router, false),
+  Middlewares = maps:get(middlewares, Router, #{}),
+  Authenticator = maps:get(authenticator, Router, undefined),
+  #router{
+    routes = map_routes_to_record(Routes),
+    debug = Debug,
+    middlewares  = map_middlewares_to_record(Middlewares),
+    authenticator = Authenticator
+  }.
+
+init(Router) when is_map(Router) ->
+  RouterRecord = map_router_to_record(Router),
+  init(RouterRecord);
 
 init(Router=#router{}) ->
 	case compile_router(Router) of 
@@ -166,6 +230,9 @@ add_defaults_routes(#route{ defaults = Defs, routes = Routes} = Route) ->
 	DefRoutes = find_defaults_routes(Defs, default_routes(), []),
 	Route#route { routes = DefRoutes ++ Routes }.
 
+compile_router(Router) when is_map(Router) ->
+  RouterRecord = map_router_to_record(Router),
+  compile_router(RouterRecord);
 compile_router(#router{} = Router) -> compile_router(Router, []).
 
 compile_router(#router{routes=[]} = Router, FullRoutes) -> Router#router{ routes = FullRoutes };

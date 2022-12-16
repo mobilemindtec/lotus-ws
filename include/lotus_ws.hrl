@@ -64,9 +64,9 @@
 
 -type middleware() 																					:: #middleware{}.
 
--record(middlewares, {values 			 = [] 										:: list(atom())
+-record(middlewares, {values 			 = [] 										:: list(atom()) % simple modules (leave, error, enter)
 										, bypass 			 = [] 										:: list(atom())
-										, handlers 		 = []											:: list(atom())}).
+										, handlers 		 = []											:: list(atom())}). % list(middleware())
 
 -type middlewares() 																				:: #middlewares{}.
 
@@ -79,13 +79,13 @@
 							,	roles              = []                     :: atom()
 							,	params 						 = #{}	                  :: map()
 							,	routes 						 = []   									:: list(route())
-							,	defaults           = []                     :: list(atom())}).
+							,	defaults           = []                     :: list(atom())}). % defaults middlewares
 
 -type route() 																							:: #route{}.
 
 -record(router, {routes 			 		 = [] 										:: list(route())
 							 , middlewares 	 		 = [] 										:: list(middleware())
-							 , authenticator 		 = undefined              :: ?HandlerFn | atom()
+							 , authenticator 		 = undefined              :: ?HandlerFn | atom() % module:authenticate(ctx()) | module:authenticate(login())
 							 , debug             = false                  :: boolean()}).
 
 

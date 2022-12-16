@@ -1,17 +1,17 @@
 -module(lotus_ws_router_test).
 
 -include_lib("eunit/include/eunit.hrl").
-
--include("include/lotus_ws.hrl").
+-include("../include/lotus_ws.hrl").
 
 -compile(export_all).
 
 % rebar3 eunit --module=lotus_ws_router_test --sys_config=test/test.config 
 
 route_sub1_test() ->
-	Router = #router {		
-		routes = [#route{path = "/", 
-								 	 	 handler = api_handler}]
+	Router = #{
+		routes => [
+      #{path => "/"
+      , handler => api_handler}]
 	},
 	#router{ routes = [Route] } = lotus_ws_router:compile_router(Router),
 	?assert(Route#route.path =:= "/").

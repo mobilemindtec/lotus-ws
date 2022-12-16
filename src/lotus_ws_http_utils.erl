@@ -125,7 +125,10 @@ handle_resp(_, #ctx{ resp = #resp { headers = Headers }} = Ctx) ->
 
 handle_resp(#ctx{} = Ctx, #resp { headers = Headers } = Response) ->
 	NewHeaders = maps:merge(find_default_content_type(Ctx), Headers),
-	Ctx#ctx { resp = Response#resp { headers = NewHeaders }, error = Response#resp.status =/= 200 }.
+	Ctx#ctx { resp = Response#resp { headers = NewHeaders }, error = Response#resp.status =/= 200 };
+
+handle_resp(#ctx{} = Ctx, _) ->
+  new_ctx_error(Ctx, "invalid handler return").
 
 handle_resp(#ctx{} = Ctx) ->
 	handle_resp(Ctx, Ctx).
