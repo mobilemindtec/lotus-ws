@@ -44,6 +44,11 @@ run_ctx(#ctx{ req = Req } = Ctx) ->
 			lager:info("route found: ~p", [Route#route.path]),
 
 			Middlewares = get_route_middlewares(Route),
+
+      lager:info("::::::::::::::::::::::::::::::::::::::::::"),
+      lager:info("Middlewares=~p", [Middlewares]),
+      lager:info("::::::::::::::::::::::::::::::::::::::::::"),
+
 			RouteCtx = Ctx#ctx{ route = Route
 												, req = Req#req{ params = Route#route.params } },
 			EnterCtx = dispatch_middwares(Middlewares, RouteCtx, enter),
@@ -68,7 +73,7 @@ run_ctx(#ctx{ req = Req } = Ctx) ->
 
 		NoRoute ->
 			lager:info("no route found = ~p", NoRoute),
-			lotus_ws_http_utils:handle_resp(ctx, lotus_ws_http_utils:not_found(Req#req.headers))
+			lotus_ws_http_utils:handle_resp(Ctx, lotus_ws_http_utils:not_found(Req#req.headers))
 	end.
 
 dispatch(<<"GET">>, #route{} = Route, #ctx { req = #req{ headers = Headers } = Req } = Ctx) ->
@@ -130,10 +135,14 @@ dispatch_middwares([#middleware{} = Middleware|Middlewares], #ctx{} = Ctx, Step)
 get_route_middlewares(#route { middlewares = Handlers }  = Route) when is_list(Handlers)->
 	get_route_middlewares(Route#route{ middlewares = #middlewares { handlers = Handlers } });
 
-get_route_middlewares(#route { middlewares = #middlewares{ values = Values, handlers = Handlers } }) ->
+get_route_middlewares(#route { middlewares = #middlewares{ values = Values, handlers = Handlers, bypass = Bypass } }) ->
 	Middlewares = lotus_ws_router:get_middlewares(),
 	CustomHandlers = lists:map(fun(H) -> #middleware{ handler = H } end, Handlers),
-	lotus_ws_utils:list_in_list(fun(X, Y) -> X#middleware.name =:= Y end, Middlewares#middlewares.handlers, Values) ++ CustomHandlers.
+	RM = lotus_ws_utils:list_in_list(fun(X, Y) -> X#middleware.name =:= Y end, Middlewares#middlewares.handlers, Values) ++ CustomHandlers,
+  lager:info("::::::::::::::Bypass=~p", [Bypass]),
+  lists:filter(fun(M) ->
+                lists:filter(fun(B) -> B =:= M#middleware.name end, Bypass) =:= []
+               end, RM).
 
 dispatch_apply_without_body(undefined, Fn, 1, [Arg1|_], _) -> apply(Fn, [Arg1]);
 dispatch_apply_without_body(Module, Fn, 1, [Arg1|_], _) -> apply(Module, Fn, [Arg1]);

@@ -21,11 +21,11 @@
 
 start(Router) ->
 	application:ensure_all_started(jwt),
-	gen_server:start({global, ?MODULE}, ?MODULE, Router, []).
+	gen_server:start({local, ?MODULE}, ?MODULE, Router, []).
 
 start_link(Router) ->
 	application:ensure_all_started(jwt),
-	gen_server:start_link({global, ?MODULE}, ?MODULE, Router, []).
+	gen_server:start_link({local, ?MODULE}, ?MODULE, Router, []).
 
 map_route_to_record(R) ->
   Handler = maps:get(handler, R, undefined),
@@ -36,7 +36,7 @@ map_route_to_record(R) ->
     fn =  maps:get(fn, R, undefined),
     handler = Handler,
     middlewares = extract_middlewares(Middlewares),
-    roles = maps:get(rolesfn, R, []),
+    roles = maps:get(roles, R, []),
     routes = map_routes_to_record(maps:get(routes, R, [])),
     defaults = maps:get(defaults, R, [])
   }.
@@ -88,6 +88,7 @@ map_router_to_record(Router) when is_map(Router) ->
   }.
 
 init(Router) when is_map(Router) ->
+  lager:info("init lotus_ws_router"),
   RouterRecord = map_router_to_record(Router),
   init(RouterRecord);
 
@@ -98,15 +99,23 @@ init(Router=#router{}) ->
 	end.
 
 %% api
+call(Args) ->
+  case whereis(?MODULE) of
+    Pid when is_pid(Pid) ->
+      gen_server:call(Pid, Args);
+    _ ->
+      lager:info("[lotus_ws_router] pid not found"),
+      {error, "pid not found"}
+  end.
 
 search(Path) ->
-	gen_server:call({global, ?MODULE}, {search, Path}).
+  call({search, Path}).
 
 get_authenticator() ->
-	gen_server:call({global, ?MODULE}, get_authenticator).
+  call(get_authenticator).
 
 get_middlewares() ->
-	gen_server:call({global, ?MODULE}, get_middlewares).
+  call(get_middlewares).
 
 %% events
 
@@ -262,7 +271,8 @@ extract_path_params(Path, ReqPath) ->
 	%?debugFmt("PathParts = ~p, ReqPathParts = ~p", [PathParts, ReqPathParts]),
 	extract_path_params(PathParts, ReqPathParts, "", #{}).
 
-extract_path_params([], _, CompiledPath, Params) -> {CompiledPath, Params};
+extract_path_params([], [], CompiledPath, Params) -> {CompiledPath, Params};
+extract_path_params([], [_|_], _, _) -> nomatch;
 
 % same path parts
 extract_path_params([SamePathPart|PathParts], [SamePathPart|ReqPathParts], CompiledPath, Params) ->

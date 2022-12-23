@@ -1,6 +1,6 @@
 -module(lotus_ws_http_utils).
 
--include("include/lotus_ws.hrl").
+-include("../include/lotus_ws.hrl").
 
 -export([
 	not_found/1,
@@ -70,7 +70,11 @@ bad_req(html, ErrorDetail) ->
 	),
 	{400, [{html, Html}]};	
 
-bad_req(_, _) -> 400.	
+bad_req(_, _) -> 400.
+
+handle_resp(Ctx, {Status, Any}) when is_map(Any) ->
+  Data = {Status, lists:map(fun(K) ->  {K, maps:get(K, Any)} end, maps:keys(Any)) },
+  handle_resp(Ctx, Data);
 
 handle_resp(#ctx{} = Ctx, {ok, Any}) ->
 	handle_resp(Ctx, {200, Any});
