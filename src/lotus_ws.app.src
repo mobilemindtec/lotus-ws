@@ -1,15 +1,16 @@
-%% -*- erlang -*-
+%% -*- erlang -*-sql_bridge
 {application, lotus_ws,
   [{description, "Rest framework built on top of cowboy"},
    {vsn, "0.1"},
    {modules, [lotus_ws_html,
               lotus_ws_handler,
               lotus_ws_router,
-              rooster_json,
+              lotus_ws_json,
               lotus_ws_http_utils,
               lotus_ws_utils,
-              lotus_ws_validation]},
+              lotus_ws_validator]},
    {registered, []},
-   {mod, {'lotus_ws_app', []}},
+   %{mod, {'lotus_ws_app', []}},
+   {included_applications, [jwt]},
    {env, []},
    {applications, [kernel, stdlib, crypto, cowboy]}]}.
