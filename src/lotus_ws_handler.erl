@@ -45,10 +45,6 @@ run_ctx(#ctx{ req = Req } = Ctx) ->
 
 			Middlewares = get_route_middlewares(Route),
 
-      lager:info("::::::::::::::::::::::::::::::::::::::::::"),
-      lager:info("Middlewares=~p", [Middlewares]),
-      lager:info("::::::::::::::::::::::::::::::::::::::::::"),
-
 			RouteCtx = Ctx#ctx{ route = Route
 												, req = Req#req{ params = Route#route.params } },
 			EnterCtx = dispatch_middwares(Middlewares, RouteCtx, enter),
@@ -139,7 +135,6 @@ get_route_middlewares(#route { middlewares = #middlewares{ values = Values, hand
 	Middlewares = lotus_ws_router:get_middlewares(),
 	CustomHandlers = lists:map(fun(H) -> #middleware{ handler = H } end, Handlers),
 	RM = lotus_ws_utils:list_in_list(fun(X, Y) -> X#middleware.name =:= Y end, Middlewares#middlewares.handlers, Values) ++ CustomHandlers,
-  lager:info("::::::::::::::Bypass=~p", [Bypass]),
   lists:filter(fun(M) ->
                 lists:filter(fun(B) -> B =:= M#middleware.name end, Bypass) =:= []
                end, RM).
