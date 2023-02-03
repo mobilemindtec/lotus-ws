@@ -95,7 +95,7 @@ init(Router) when is_map(Router) ->
 init(Router=#router{}) ->
 	case compile_router(Router) of 
 		NewRouter=#router{} -> 
-			lager:info("ROUTER = ~p", [NewRouter]),
+			%lager:info("ROUTER = ~p", [NewRouter]),
 			{ok, #state{ router = NewRouter } };
 		Fail -> Fail		
 	end.
