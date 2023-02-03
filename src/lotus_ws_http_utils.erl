@@ -88,11 +88,17 @@ handle_resp(#ctx{} = Ctx, {server_error, Any}) ->
 handle_resp(#ctx{} = Ctx, {bad_request, Any}) ->
 	handle_resp(Ctx, {400, Any});
 
+handle_resp(#ctx{} = Ctx, {200, {text, ResponseBody}}) ->
+	handle_resp(Ctx, {200, [{text, ResponseBody}]});
+
 handle_resp(#ctx{} = Ctx, {200, [{text, ResponseBody}]}) ->
 	Ctx#ctx { resp = #resp { status = 200, body = ResponseBody, headers = ?CONTENT_TYPE_TEXT }};
 
 handle_resp(#ctx{} = Ctx, {200, [{json, ResponseBody}]}) ->
 	Ctx#ctx { resp = #resp { status = 200, body = lotus_ws_json:encode(ResponseBody), headers = ?CONTENT_TYPE_JSON }};
+
+handle_resp(#ctx{} = Ctx, {200, {html, ResponseBody}}) ->
+	handle_resp(Ctx, {200, [{html, ResponseBody}]});
 
 handle_resp(#ctx{} = Ctx, {200, [{html, ResponseBody}]}) ->
 	Ctx#ctx { resp = #resp { status = 200, body = ResponseBody, headers = ?CONTENT_TYPE_HTML }};

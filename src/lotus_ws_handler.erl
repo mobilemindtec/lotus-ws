@@ -68,7 +68,7 @@ run_ctx(#ctx{ req = Req } = Ctx) ->
 			end;
 
 		NoRoute ->
-			lager:info("no route found = ~p", NoRoute),
+			lager:info("no route found. path = ~p, state = ~p", [Req#req.path, NoRoute]),
 			lotus_ws_http_utils:handle_resp(Ctx, lotus_ws_http_utils:not_found(Req#req.headers))
 	end.
 
