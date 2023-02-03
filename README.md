@@ -1,10 +1,57 @@
 # lotus-ws
-ER lang web framework on top cowboy
+ER lang web framework build on top cowboy
 
+
+## Middlewares
+
+### Full middleware
+	
+	-module(test_md).
+
+	-include_lib("lotus_ws/include/lotus_ws.hrl").
+
+	-export([
+		enter/1,
+		leave/1,
+		error/1
+	]).
+
+	enter(Ctx=#Ctx{}) -> Ctx.
+	leave(Ctx=#Ctx{}) -> Ctx.
+	error(Ctx=#Ctx{}) -> Ctx.
+
+## Handler routers
+
+	-module(test_ctrl).
+	-include_lib("lotus_ws/include/lotus_ws.hrl").
+
+	-export([
+		get/1,
+		post/1,
+		put/1,
+		delete/1,
+		patch/1
+	]).
+
+	% route /my/route/:id([0-9])
+	get('/my/route/:id', #ctx { req = #req { params = #{ "id" := Id } }}) ->
+		% id is integer
+		{ok, {json, []}}.
+
+	% route /my/route/:name
+	get('/my/route/:name', _, #req { params = #{ "name" := Id } }) ->
+		% name is string
+		{ok, {json, []}}.
+
+	% use default middleware lotus_ws_body_json_parse_mw to receive body as map()
+	post('/my/route', Ctx=#ctx{}, Req=req{}, Body) ->
+		{ok, {text, "ok"}}.
 
 ## Example
 
 ### Routes configs 
+	
+	%% lotus_ws_body_json_parse_mw and chat_token_resolver_mw are default middlewares
 
 	get_routes() -> [  
 
