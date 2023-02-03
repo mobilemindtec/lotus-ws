@@ -79,20 +79,26 @@ Example of controlles with handlers, middlewares and validations
 
 #### healthcheck_controller.erl
 
+	
 	-module(healthcheck_controller).
+
 	-export([get/2]).
+
 	get("/healthcheck", _) ->
 		{ok, {text, "alive"}}.
 
 
 #### login_controller.erl
 
-		-module(login_controller).
-		-include_lib("lotus_ws/include/lotus_ws.hrl").
-		-export([
-			post/4,
-			enter/1
-		]).
+		
+	-module(login_controller).
+	
+	-include_lib("lotus_ws/include/lotus_ws.hrl").
+	
+	-export([
+		post/4,
+		enter/1
+	]).
 
 	rules() -> 
 		[lotus_ws_validator:new_rule(<<"username">>, [required]),
@@ -129,6 +135,7 @@ Example of controlles with handlers, middlewares and validations
 
 #### messages_controller.erl
 
+	
 	-module(chat_message_controller).
 
 	-include_lib("lotus_ws/include/lotus_ws.hrl").
