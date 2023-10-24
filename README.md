@@ -5,21 +5,21 @@ ER lang web framework build on top cowboy
 ## Middlewares
 
 ### Full middleware
-	
-	-module(test_md).
+```erlang
+-module(test_md).
 
-	-include_lib("lotus_ws/include/lotus_ws.hrl").
+-include_lib("lotus_ws/include/lotus_ws.hrl").
 
-	-export([
-		enter/1,
-		leave/1,
-		error/1
-	]).
+-export([
+	enter/1,
+	leave/1,
+	error/1
+]).
 
-	enter(Ctx=#Ctx{}) -> Ctx.
-	leave(Ctx=#Ctx{}) -> Ctx.
-	error(Ctx=#Ctx{}) -> Ctx.
-
+enter(Ctx=#Ctx{}) -> Ctx.
+leave(Ctx=#Ctx{}) -> Ctx.
+error(Ctx=#Ctx{}) -> Ctx.
+```
 ## Handler routers
 
 	-module(test_ctrl).
