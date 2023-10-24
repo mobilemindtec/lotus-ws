@@ -5,7 +5,8 @@ ER lang web framework build on top cowboy
 ## Middlewares
 
 ### Full middleware
-```erlang
+
+```erl
 -module(test_md).
 
 -include_lib("lotus_ws/include/lotus_ws.hrl").
@@ -21,7 +22,8 @@ leave(Ctx=#Ctx{}) -> Ctx.
 error(Ctx=#Ctx{}) -> Ctx.
 ```
 ## Handler routers
-```erlang
+
+```erl
 -module(test_ctrl).
 -include_lib("lotus_ws/include/lotus_ws.hrl").
 
