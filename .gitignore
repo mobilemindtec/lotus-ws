@@ -2,3 +2,6 @@ _build
 _checkout
 *.beam
 *.lock
+.envrc
+*.crashdump
+TEST-*.xml

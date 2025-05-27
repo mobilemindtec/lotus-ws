@@ -14,7 +14,7 @@
 	list_in_list_any/3,
 	binary_to_string/1,
 	get_env/2
-]).
+	]).
 
 is_content_type(Headers, ContentType) ->
 	maps:is_key(<<"content-type">>, Headers) andalso maps:get(<<"content-type">>) =:= ContentType.
@@ -45,32 +45,32 @@ get_content_type(Headers) ->
 sprint(Fmt, []) -> lists:flatten(Fmt);
 
 sprint(Fmt, [{ K, V} | T]) ->
-		Word = "\\$" ++ atom_to_list(K),		
-		if 
-			is_number(V) ->
-				Valor = lists:flatten(io_lib:format("~p", [V]));
-			is_atom(V) ->
-				Valor = lists:flatten(io_lib:format("~p", [V]));
-			true ->
-				Valor = V
-		end,
-    Fmt1 = re:replace(Fmt, Word, Valor, [{return, list}]),
-    sprint(Fmt1, T).
+	Word = "\\$" ++ atom_to_list(K),		
+	if 
+		is_number(V) ->
+			Valor = lists:flatten(io_lib:format("~p", [V]));
+		is_atom(V) ->
+			Valor = lists:flatten(io_lib:format("~p", [V]));
+		true ->
+			Valor = V
+	end,
+	Fmt1 = re:replace(Fmt, Word, Valor, [{return, list}]),
+	sprint(Fmt1, T).
 
 find_module_fn(Module, FnName) ->
-	lists:keyfind(FnName, 1, apply(Module, module_info, [exports])).	
+	lists:keyfind(FnName, 1, apply(Module, module_info, [exports])).
 
 list_in_list(Fn, ListX, ListY) ->
 	lists:filter(fun(X) -> 
-		Rs = lists:filter(fun(Y) -> Fn(X, Y) end, ListY),
-		length(Rs) > 0
-	end, ListX).	
+				Rs = lists:filter(fun(Y) -> Fn(X, Y) end, ListY),
+				length(Rs) > 0
+		end, ListX).	
 
 list_in_list_not(Fn, ListX, ListY) ->
 	lists:filter(fun(X) -> 
-		Rs = lists:filter(fun(Y) -> Fn(X, Y) end, ListY),
-		length(Rs) =:= 0
-	end, ListX).	
+				Rs = lists:filter(fun(Y) -> Fn(X, Y) end, ListY),
+				length(Rs) =:= 0
+		end, ListX).	
 
 list_in_list_any(Fn, ListX, ListY) ->
 	Results = list_in_list(Fn, ListX, ListY),
@@ -81,7 +81,7 @@ binary_to_string(Bin) ->
 
 
 get_env(Var, Def) ->
-    case application:get_env(lotus_ws, Var) of
-        undefined -> Def;
-        {ok, Val} -> Val
-    end.
+	case application:get_env(lotus_ws, Var) of
+		undefined -> Def;
+		{ok, Val} -> Val
+	end.

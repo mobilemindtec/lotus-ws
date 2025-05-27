@@ -5,7 +5,7 @@
 
 -export([
 	enter/1
-]).
+	]).
 
 unauthorized() -> {401, [{json, [{message, "unauthorized"}]}]}.
 
@@ -14,10 +14,10 @@ route_roles(_) -> [].
 
 default_configs() ->
 	[
-	  {key, "12345678"},
-	  {exp, 3600},
-	  {alg, "HS256"}
-	].
+		{key, "12345678"},
+		{exp, 3600},
+		{alg, "HS256"}
+		].
 
 get_config(Key, List) ->
 	Def = proplists:get_value(Key, default_configs()),
@@ -31,7 +31,7 @@ decode_token(Token,Key) -> jwt:decode(Token, Key).
 
 auth_result({ok, Claims}) -> 
 	#auth { username = maps:get(<<"username">>, Claims),
-				 	roles = maps:get(<<"roles">>, Claims) };
+		roles = maps:get(<<"roles">>, Claims) };
 auth_result(_) -> undefined.
 
 validate_roles([], undefined) -> false;
@@ -44,12 +44,14 @@ auth_finish(Ctx, Auth, true) -> Ctx#ctx { auth = Auth };
 auth_finish(_, _, false) -> unauthorized().
 
 enter(#ctx{ route = Route, req = #req { headers = Headers }} = Ctx) -> 
+	%?debugMsg("enter"),
 	Configs = lotus_ws_utils:get_env(bearer_token, default_configs()),
 	Key = get_config(key, Configs),
 	Token = parse_token(maps:get(<<"authorization">>, Headers, undefined)),
 	Claims = decode_token(Token, Key),
 	Auth = auth_result(Claims),
 	Validate = validate_roles(route_roles(Route), Auth),
+	%logger:debug("Token ~p, ~p", [Token, Auth]),
 	auth_finish(Ctx, Auth, Validate);
 
 enter(_) -> unauthorized().

@@ -6,12 +6,13 @@
 
 -export([
 	init/2
-]).
+	]).
 
 %% standalone routes
 -export([
-	run_ctx/1
-]).
+	run_ctx/1,
+	prepare_ctx/1
+	]).
 
 -spec init(Req, any()) -> Req when Req :: cowboy_req:req().
 
@@ -33,22 +34,26 @@ create_ctx(#{path := Path, method := Method, headers := Headers} = Req) ->
 			queries = cowboy_req:parse_qs(Req),
 			headers = Headers}}.
 
+prepare_ctx(#ctx{} = Ctx) ->
+	Ctx#ctx { authenticator = lotus_ws_router:get_authenticator() }.
+
 -spec run_ctx(Ctx) -> Ctx when Ctx :: ctx().
 
 run_ctx(#ctx{ req = Req } = Ctx) ->	
-	%lager:info("Body = ~p", [Body]),
-
+	
 	case lotus_ws_router:search(Req#req.path) of
 		Route=#route{} ->
-
-			lager:info("route found: ~p", [Route#route.path]),
-
+			
+			%logger:debug("route found: ~p", [Route#route.path]),
+			
 			Middlewares = get_route_middlewares(Route),
-
+			
+			%logger:debug("route mw ~p", [length(Middlewares)]),
+			
 			RouteCtx = Ctx#ctx{ route = Route
-												, req = Req#req{ params = Route#route.params } },
+					, req = Req#req{ params = Route#route.params } },
 			EnterCtx = dispatch_middwares(Middlewares, RouteCtx, enter),
-
+			
 			case EnterCtx of
 				#ctx{ error = true } -> EnterCtx;
 				_ ->
@@ -60,21 +65,21 @@ run_ctx(#ctx{ req = Req } = Ctx) ->
 								_ -> leave					
 							end,
 							dispatch_middwares(Middlewares, RespCtx, NextAction)
-						catch
-							Throw -> 
-								lager:error("Throw = ~p", [Throw]),
-								lotus_ws_http_utils:new_ctx_error(EnterCtx, lotus_ws_utils:sprint("$reason", [{reason, Throw}]))
+					catch
+						Throw -> 
+							logger:error("Throw = ~p", [Throw]),
+							lotus_ws_http_utils:new_ctx_error(EnterCtx, lotus_ws_utils:sprint("$reason", [{reason, Throw}]))
 					end
 			end;
-
+		
 		NoRoute ->
-			lager:info("no route found. path = ~p, state = ~p", [Req#req.path, NoRoute]),
+			logger:info("no route found. path = ~p, state = ~p", [Req#req.path, NoRoute]),
 			lotus_ws_http_utils:handle_resp(Ctx, lotus_ws_http_utils:not_found(Req#req.headers))
 	end.
 
 dispatch(<<"GET">>, #route{} = Route, #ctx { req = #req{ headers = Headers } = Req } = Ctx) ->
 	Module = Route#route.handler,
-	case find_fn(Module, Route#route.fn, get) of
+	case find_fn(Module, Route#route.handler_fn, get) of
 		{Fn, ArityCount } ->
 			dispatch_apply_without_body(Module, Fn, ArityCount, [Route#route.compiled_path, Ctx, Req], Headers);
 		false ->
@@ -86,7 +91,8 @@ dispatch(<<"PUT">>, #route{} = Route, #ctx {} = Ctx) -> dispatch(put, Route, Ctx
 dispatch(<<"PATCH">>, #route{} = Route, #ctx {} = Ctx) -> dispatch(patch, Route, Ctx);
 dispatch(Method, #route{} = Route, #ctx { req = #req{ body = Body, headers = Headers } = Req } = Ctx) ->
 	Module = Route#route.handler,
-	case find_fn(Module, Route#route.fn, Method) of
+	%?debugFmt("find by ~p:~p or ~p", [Module, Method, Route#route.handler_fn]),
+	case find_fn(Module, Route#route.handler_fn, Method) of
 		{Fn, ArityCount } ->
 			dispatch_apply_with_body(Module, Fn, ArityCount, [Route#route.compiled_path, Ctx, Req, Body], Headers);
 		false ->
@@ -117,9 +123,9 @@ dispatch_middwares([#middleware{} = Middleware|Middlewares], #ctx{} = Ctx, Step)
 		error ->
 			dispatch_middware(Module, error, Middleware#middleware.error, Ctx)
 	end,
-
+	
 	NewCtx = lotus_ws_http_utils:handle_resp(Ctx, Result),
-
+	
 	case NewCtx of
 		#ctx{ error = true } ->
 			dispatch_middwares(Middlewares, NewCtx, error);
@@ -131,13 +137,16 @@ dispatch_middwares([#middleware{} = Middleware|Middlewares], #ctx{} = Ctx, Step)
 get_route_middlewares(#route { middlewares = Handlers }  = Route) when is_list(Handlers)->
 	get_route_middlewares(Route#route{ middlewares = #middlewares { handlers = Handlers } });
 
-get_route_middlewares(#route { middlewares = #middlewares{ values = Values, handlers = Handlers, bypass = Bypass } }) ->
+get_route_middlewares(#route { middlewares = #middlewares{ values = Values, handlers = Handlers, ignore = Ignore } }) ->
 	Middlewares = lotus_ws_router:get_middlewares(),
 	CustomHandlers = lists:map(fun(H) -> #middleware{ handler = H } end, Handlers),
-	RM = lotus_ws_utils:list_in_list(fun(X, Y) -> X#middleware.name =:= Y end, Middlewares#middlewares.handlers, Values) ++ CustomHandlers,
-  lists:filter(fun(M) ->
-                lists:filter(fun(B) -> B =:= M#middleware.name end, Bypass) =:= []
-               end, RM).
+	RM = lotus_ws_utils:list_in_list(
+			fun(X, Y) -> 
+					X#middleware.name =:= Y end,
+			Middlewares, Values),
+	lists:filter(fun(M) ->
+				lists:filter(fun(B) -> B =:= M#middleware.name end, Ignore) =:= []
+		end, RM ++ CustomHandlers).
 
 dispatch_apply_without_body(undefined, Fn, 1, [Arg1|_], _) -> apply(Fn, [Arg1]);
 dispatch_apply_without_body(Module, Fn, 1, [Arg1|_], _) -> apply(Module, Fn, [Arg1]);
@@ -159,11 +168,12 @@ dispatch_apply_with_body(Module, Fn, 4, [Arg1, Arg2, Arg3, Arg4|_], _) -> apply(
 dispatch_apply_with_body(_, _, Arity, _, Headers) ->
 	lotus_ws_http_utils:server_error(Headers, lotus_ws_utils:sprint("action post expects min 1 max 4 args, but found $count args", [{count, Arity}])).
 
+%% no handler configured
 find_fn(undefined, undefined, _) -> false;
+%% handler fn
 find_fn(undefined, Fun, _) -> find_fn_arity(erlang:fun_info(Fun, arity), Fun);
+%% handler module:fun
 find_fn(Module, undefined, FunName) ->  find_fn_arity(lotus_ws_utils:find_module_fn(Module, FunName), FunName).
 
 find_fn_arity({_, ArityCount}, Fn) -> 	{Fn, ArityCount};
 find_fn_arity(false, _) -> false.
-
-	

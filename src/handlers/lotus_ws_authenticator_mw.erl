@@ -4,7 +4,7 @@
 
 -export([
 	enter/1
-]).
+	]).
 
 unauthorized() -> {401, [{auto, [{message, <<"required username and password">>}]}]}.
 server_error() -> {500, [{auto, [{message, <<"wrong auth callback">>}]}]}.
@@ -18,7 +18,7 @@ call_authenticator(_, _, undefined, _) -> server_error();
 call_authenticator(#ctx{} = Ctx, {arity, 1}, Module, AuthFn) ->
 	apply(Module, AuthFn, [Ctx]);		
 call_authenticator(#ctx{ req = #req { body = Login }} = Ctx, {arity, 2}, Module, AuthFn) ->
- apply(Module, AuthFn, [Ctx, Login]);
+	apply(Module, AuthFn, [Ctx, Login]);
 call_authenticator(_, _, _, _) -> server_error().
 
 call_authenticator(Ctx, true, Authenticator) -> 

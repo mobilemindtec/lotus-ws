@@ -1,5 +1,7 @@
 -module(lotus_ws_dummy_handler).
 
+-include("include/lotus_ws.hrl").
+
 -export([
 	get/2,
 	post/2,
@@ -9,7 +11,7 @@
 	enter/1,
 	leave/1,
 	error/1
-]).
+	]).
 
 
 enter(Ctx) -> Ctx.

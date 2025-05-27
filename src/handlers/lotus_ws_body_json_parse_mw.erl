@@ -4,14 +4,15 @@
 
 -export([
 	enter/1
-]).
+	]).
 
 invalid_json() -> {500, [{json, [{error, <<"invalid json content">>}]}]}.
 
 body_parse(Ctx, _, undefined) -> Ctx;
-body_parse(#ctx{ req = Req } = Ctx, true, Body) -> Ctx#ctx{ req = Req#req { body = jsx:decode(Body)} };
 body_parse(_, false, _) -> invalid_json();
-body_parse(_, {incomplete, _}, _) -> invalid_json().
+body_parse(_, {incomplete, _}, _) -> invalid_json();
+body_parse(#ctx{ req = Req } = Ctx, true, Body) -> 
+	Ctx#ctx{ req = Req#req { body = jsx:decode(Body)} }.
 
 
 enter(#ctx{ req = #req { body = Body }} = Ctx) -> 

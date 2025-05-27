@@ -2,83 +2,100 @@
 
 -include_lib("eunit/include/eunit.hrl").
 
--include("include/lotus_ws.hrl").
+-include("../include/lotus_ws.hrl").
 
 -compile(export_all).
 
 % rebar3 eunit --module=lotus_ws_handler_test --sys_config=test/test.config 
 
-login_ctx(Password) -> #ctx {
-		req = #req {
-			path = "/login",
-			method = <<"POST">>,
-			headers = #{<<"content-type">> => <<"application/json">>},
-			body = jsx:encode([{username, "test"}, {password, Password}])
-		}
-	}.
 
-user_me_ctx(Token) -> #ctx {
-		req = #req {
-			path = "/api/user/me",
-			method = <<"GET">>,
-			headers = #{
-				<<"content-type">> => <<"application/json">>,
-				<<"authorization">> => Token
-			}
-		}
-	}.	
+setup() -> 
+	ok.
+
+cleanup(_) ->
+	ok.
+
+handler_test_() ->
+	
+	{setup, 
+		fun setup/0,
+		fun cleanup/1,
+		[
+			?_test(handler_login_success()),
+			?_test(handler_login_failure()),
+			?_test(handler_auth_and_enter_auth_route())
+			]}.
 
 
-default_handler_test() ->
-
-	Router = #router {				
-		routes = [#route{path = "/", 
-										 defaults = [bearer_token]}]
-	},
-	CompiledRouter = lotus_ws_router:compile_router(Router),
-	#ctx{ resp = Resp } = lotus_ws_handler:process_ctx(login_ctx("test123"), CompiledRouter),
+%  rebar3 eunit --test=lotus_ws_handler_test:handler_login_success_test  --sys_config=test/test.config
+handler_login_success() ->
+	Router = #router {
+			authenticator = data_test:default_authenticator(),
+			routes = [
+				data_test:login_route()
+				]},
+	{ok, Pid} = lotus_ws_router:start(Router),
+	LoginCtx = lotus_ws_handler:prepare_ctx(data_test:login_ctx("test123")),
+	#ctx{ resp = Resp } = lotus_ws_handler:run_ctx(LoginCtx),
+	lotus_ws_router:stop(Pid),
 	?assert(Resp#resp.status =:= 200).
 
-default_handler_auth_test() ->
-
-	Router = #router {				
-		authenticator = fun(Ctx, #login{username = Username, password = Password}) -> 
-			if 
-				Username =:= "test" andalso Password =:= "test123" ->
-					?debugMsg("OK!"),
-					Ctx;
-				true -> 
-					?debugMsg("401"),
-					{401, [{json, [{message, <<"invalid username or password">>}]}]}
-			end
-		end,
-		routes = [#route{path = "/", 
-										 defaults = [bearer_token],
-										 routes = [
-										 	#route {
-										 		path = "/api/user/me",
-												middlewares = [lotus_ws_bearer_token_auth_mw],
-												fn = fun(Ctx) -> {200, [{json, [{status, "success"}]}]} end
-										 	}
-										 ]}]
-	},
-
-	CompiledRouter = lotus_ws_router:compile_router(Router),
+%  rebar3 eunit --test=lotus_ws_handler_test:handler_login_failure_test  --sys_config=test/test.config
+handler_login_failure() ->
 	
-	LoginCtxFail = lotus_ws_handler:from_ctx(login_ctx("test"), Router),
-	#ctx{ resp = RespAuthFail } = lotus_ws_handler:process_ctx(LoginCtxFail, CompiledRouter),	
-	?debugFmt("RespAuthFail = ~p", [RespAuthFail]),
+	Router = #router {
+			authenticator = data_test:default_authenticator(),
+			routes = [
+				data_test:login_route()
+				]
+			},
+	{ok, Pid} = lotus_ws_router:start(Router),
+	LoginCtx = lotus_ws_handler:prepare_ctx(data_test:login_ctx("test")),
+	#ctx{ resp = Resp } = lotus_ws_handler:run_ctx(LoginCtx),
+	lotus_ws_router:stop(Pid),
+	?assert(Resp#resp.status =:= 401).
+
+
+handler_auth_and_enter_auth_route() ->
+	
+	Router = #router {				
+			authenticator = data_test:default_authenticator(),
+			routes = [#route {
+					path = "/",
+					routes = [
+						data_test:login_route(),					
+						#route {
+							path = "/api/user/me",
+							middlewares = [lotus_ws_bearer_token_auth_mw],
+							handler_fn  = fun(_) -> 
+									{200, [{json, [{status, "success"}]}]} 
+							end
+							}
+						]
+					}
+				
+				]},
+	
+	{ok, Pid} = lotus_ws_router:start(Router),
+	
+	
+	LoginCtxFail = lotus_ws_handler:prepare_ctx(data_test:login_ctx("test")),
+	#ctx{ resp = RespAuthFail } = lotus_ws_handler:run_ctx(LoginCtxFail),	
+	%?debugFmt("RespAuthFail = ~p", [RespAuthFail]),
 	?assert(RespAuthFail#resp.status =:= 401),
 	
-	LoginCtxSuccess = lotus_ws_handler:from_ctx(login_ctx("test123"), Router),
-	#ctx{ resp = RespAuth } = lotus_ws_handler:process_ctx(LoginCtxSuccess, CompiledRouter),	
-	?debugFmt("RespAuth = ~p", [RespAuth]),
+	LoginCtxSuccess = lotus_ws_handler:prepare_ctx(data_test:login_ctx("test123")),
+	#ctx{ resp = RespAuthSuccess } = lotus_ws_handler:run_ctx(LoginCtxSuccess),	
+	%?debugFmt("RespAuthSuccess = ~p", [RespAuthSuccess]),
 	
-	#ctx{ resp = RespFail } = lotus_ws_handler:process_ctx(user_me_ctx(<<"xxxxxxx">>), CompiledRouter),
-	?debugFmt("RespFail = ~p", [RespFail]),
-	?assert(RespFail#resp.status =:= 401),
-
-	#{ <<"access_token">> := AccessToken } = jsx:decode(RespAuth#resp.body),
-	#ctx{ resp = Resp } = lotus_ws_handler:process_ctx(user_me_ctx(AccessToken), CompiledRouter),
-	?debugFmt("Resp = ~p", [Resp]),
-	?assert(Resp#resp.status =:= 200).	
+	UserMeWithInvalidTokenCtx = lotus_ws_handler:prepare_ctx(data_test:user_me_ctx(<<"xxxxxxx">>)),
+	#ctx{ resp = RespAuthTokenFail } = lotus_ws_handler:run_ctx(UserMeWithInvalidTokenCtx),
+	%?debugFmt("RespAuthTokenFail = ~p", [RespAuthTokenFail]),
+	?assert(RespAuthTokenFail#resp.status =:= 401),
+	
+	#{ <<"access_token">> := AccessToken } = jsx:decode(RespAuthSuccess#resp.body),
+	UserMeWithValidTokenCtx = lotus_ws_handler:prepare_ctx(data_test:user_me_ctx(AccessToken)),
+	#ctx{ resp = RespAuthTokenSuccess } = lotus_ws_handler:run_ctx(UserMeWithValidTokenCtx),
+	%?debugFmt("RespAuthTokenSuccess = ~p", [RespAuthTokenSuccess]),
+	lotus_ws_router:stop(Pid),
+	?assert(RespAuthTokenSuccess#resp.status =:= 200).	
