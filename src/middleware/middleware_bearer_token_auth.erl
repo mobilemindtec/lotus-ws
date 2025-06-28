@@ -1,7 +1,9 @@
--module(lotus_ws_bearer_token_auth_mw).
-
+-module(middleware_bearer_token_auth).
 -include("include/lotus_ws.hrl").
 
+%%
+%% Middleware to auth bearer token authorization
+%%
 
 -export([
 	enter/1
@@ -40,8 +42,8 @@ validate_roles(_, #auth{ roles = [] }) -> false;
 validate_roles(RouteRoles, #auth{ roles = AuthRoles }) -> 
 	lotus_ws_utils:list_in_list_any(fun(X, Y) -> X =:= Y end, AuthRoles, RouteRoles).	
 
-auth_finish(Ctx, Auth, true) -> Ctx#ctx { auth = Auth };
-auth_finish(_, _, false) -> unauthorized().
+next(Ctx=#ctx{req = Req}, Auth, true) -> Ctx#ctx { req = Req#req{ auth = Auth }};
+next(_, _, false) -> unauthorized().
 
 enter(#ctx{ route = Route, req = #req { headers = Headers }} = Ctx) -> 
 	%?debugMsg("enter"),
@@ -52,6 +54,6 @@ enter(#ctx{ route = Route, req = #req { headers = Headers }} = Ctx) ->
 	Auth = auth_result(Claims),
 	Validate = validate_roles(route_roles(Route), Auth),
 	%logger:debug("Token ~p, ~p", [Token, Auth]),
-	auth_finish(Ctx, Auth, Validate);
+	next(Ctx, Auth, Validate);
 
 enter(_) -> unauthorized().

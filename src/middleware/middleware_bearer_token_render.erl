@@ -1,6 +1,9 @@
--module(lotus_ws_bearer_token_mw).
-
+-module(middleware_bearer_token_render).
 -include("include/lotus_ws.hrl").
+
+%%
+%% Middleware to respond bearer token
+%%
 
 -export([
 	enter/1
@@ -22,7 +25,7 @@ get_config(Key, List) ->
 	Def = proplists:get_value(Key, default_configs()),
 	proplists:get_value(Key, List, Def).
 
-enter(#ctx{ auth = Auth, req = #req { body = #login{ username = Username } }}) -> 
+enter(#ctx{ req = #req { auth = Auth, body = #login{ username = Username } }}) -> 
 	%?debugMsg("enter"),
 	Configs = lotus_ws_utils:get_env(bearer_token, default_configs()),
 	Key = get_config(key, Configs),

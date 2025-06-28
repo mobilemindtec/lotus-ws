@@ -1,4 +1,4 @@
--module(lotus_ws_dummy_handler).
+-module(dummy_handler).
 
 -include("include/lotus_ws.hrl").
 

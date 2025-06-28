@@ -75,12 +75,12 @@ get_routes() -> [
             #{path => "/read"
             , handler => message_controller,
               middlewares => #{
-                bypass => [message_controller]
+                ignore => [message_controller]
               }},
             #{path => "/received"
             , handler => message_controller,
               middlewares => #{
-                bypass => [message_controller]
+                ignore => [message_controller]
               }}
           ]}]
     }

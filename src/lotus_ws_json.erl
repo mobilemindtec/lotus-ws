@@ -6,16 +6,16 @@
 	]).
 
 str_to_bin_map(Map) ->
-	str_to_bin_map(maps:keys(Map), Map).
-str_to_bin_map([], Map) -> Map;
-str_to_bin_map([K|T], Map) ->
+	str_to_bin_map(maps:keys(Map), Map, #{}).
+str_to_bin_map([], _, Acc) -> Acc;
+str_to_bin_map([K|T], Map, Acc) ->
 	Val = maps:get(K, Map),
 	NewVal = case Val of
 		V when is_map(V) -> str_to_bin_map(V);
 		_ -> Val
 	end,
-	NewMap = maps:merge(Map, #{string_to_bin(K) => string_to_bin(NewVal)}),
-	str_to_bin_map(T, NewMap).
+	NewMap = maps:merge(Acc, #{string_to_bin(K) => string_to_bin(NewVal)}),
+	str_to_bin_map(T, Map, NewMap).
 
 str_to_bin(List) -> str_to_bin(List, []).
 
@@ -42,15 +42,30 @@ atom_to_str(undefined) -> null;
 atom_to_str(Val) when is_atom(Val) -> lists:flatten(io_lib:format("~p", [Val]));
 atom_to_str(Val) -> Val.
 
-bin_to_str(List) -> bin_to_str(List, []).
-bin_to_str([], Result) -> Result;
+bin_to_str_map(Map) ->
+	bin_to_str_map(maps:keys(Map), Map, #{}).
+bin_to_str_map([], _, Acc) -> Acc;
+bin_to_str_map([K|T], Map, Acc) ->
+	Val = maps:get(K, Map),
+	NewVal = case Val of
+		V when is_map(V) -> bin_to_str_map(V);
+		V when is_binary(V) -> binary_to_list(V);
+		_ -> Val
+	end,
+	NewMap = maps:merge(Acc, #{binary_to_list(K) => NewVal}),
+	bin_to_str_map(T, Map, NewMap).
 
+
+bin_to_str(List) when is_list(List) -> bin_to_str(List, []);
+bin_to_str(List) when is_map(List) -> bin_to_str_map(List).
+
+bin_to_str([], Result) -> Result;
 bin_to_str([[_|_]=Item|Tail], ListOfList) ->
-	NewItem = bin_to_str(Item, []), bin_to_str(Tail, ListOfList++[NewItem]);
+	NewItem =  bin_to_str(Item, []),
+	bin_to_str(Tail, ListOfList++[NewItem]);
 
 bin_to_str([{_, _} = Val | T], ListResult) ->
 	NewVal = bin_to_string(Val), bin_to_str(T, ListResult++[NewVal]).
-
 bin_to_string({K, V}) ->
 	{binary_to_list(K), binary_to_list(V)}.
 
@@ -62,7 +77,7 @@ encode(Message) ->
 decode(Json) ->
 	case jsx:is_json(Json) of
 		true ->
-			Decoded = jsx:decode(Json, [{return_maps, false}]),
+			Decoded = jsx:decode(Json),
 			bin_to_str(Decoded);
 		_ -> undefined
 	end.

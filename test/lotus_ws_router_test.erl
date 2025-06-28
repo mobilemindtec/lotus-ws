@@ -84,25 +84,34 @@ route2_sub4_test() ->
 route_handlers_test() ->	
 	
 	Router = #router {
-			routes = [#route{path = "/", 
-					middlewares = #middlewares{ values = [test] },
-					routes = [
-						#route { path = "/api", handler = test, routes = [#route { path = "/customer", handler = test }] },
-						#route { path = "/site", handler = test, routes = [#route { path = "/test", handler = test, middlewares = #middlewares{ ignore = [test] } }] }
-						]}],
-			middlewares = [
-				#middleware {
-					name = test,
-					handler = m_handler
-					}
-				]
-			},
+			routes = [#route{
+					path = "/"
+					,middlewares = [module_x]
+					,routes = [
+						#route { 
+							path = "/api"
+							, handler = test
+							, routes = [
+								#route { path = "/customer", handler = test }
+								] 
+							},
+						#route { 
+							path = "/site"
+							, handler = test
+							, routes = [
+								#route { 
+									path = "/test"
+									, handler = test
+									, middlewares = [middleware_y] 
+									}
+								]}]
+					}]},
 	#router{ routes = Results } = lotus_ws_router:compile_router(Router),
 	%?debugFmt("route paths ~p", [lists:map(fun(#route{path = P}) -> P end, Results)]),
 	
 	%?debugFmt("route middlewares ~p", [lists:map(fun(#route{middlewares = M}) -> M#middlewares.values end, Results)]),
 	
-	MCount = fun (#route{ middlewares = M}) -> length(M#middlewares.values) end,
+	MCount = fun (#route{ middlewares = M}) -> length(M) end,
 	
 	[Route1, Route2, Route3, Route4] = Results,
 	?assert(Route1#route.path =:= "/api"),
@@ -112,7 +121,7 @@ route_handlers_test() ->
 	?assert(Route3#route.path =:= "/site"),
 	?assert(MCount(Route3) =:= 1),
 	?assert(Route4#route.path =:= "/site/test"),
-	?assert(MCount(Route4) =:= 0).		
+	?assert(MCount(Route4) =:= 2).		
 
 
 route_regexp_id_test() ->
@@ -144,21 +153,3 @@ route_regexp_id_limit_offset_test() ->
 	%?debugFmt("route_regexp_test = route = ~p, ~p", [Route#route.params, Route#route.compiled_path]),
 	?assert(Route#route.compiled_path =:= "/api/:id/:limit/:offset"),
 	?assert(maps:size(Route#route.params) =:= 3).		
-
-route_with_defaults_test() ->
-	
-	Router = #router {				
-			routes = [#route{path = "/", 					
-					routes = [
-						data_test:login_route(),
-						#route {
-							path = "/api/user",
-							handler = api_handler
-							}
-						]}]
-			},
-	Result = lotus_ws_router:compile_router(Router),
-	%?debugFmt("Result = ~p", [Result]),
-	#router{ routes = [Route1, Route2] } = Result,
-	?assert(Route1#route.path =:= "/login"),
-	?assert(Route2#route.path =:= "/api/user").	

@@ -5,15 +5,20 @@
 	is_json/1,
 	is_html/1,
 	is_text/1,
+	is_form/1,
 	get_content_type_atom/1,
 	get_content_type/1,
+	get_accept/1,
+	get_accept_atom/1,
 	sprint/2,
 	find_module_fn/2,
 	list_in_list/3,
 	list_in_list_not/3,
 	list_in_list_any/3,
 	binary_to_string/1,
-	get_env/2
+	get_env/2,
+	get_response_type/1,
+	get_response_type_atom/1
 	]).
 
 is_content_type(Headers, ContentType) ->
@@ -22,11 +27,13 @@ is_content_type(Headers, ContentType) ->
 is_json(Headers) -> is_content_type(Headers, <<"application/json">>).
 is_html(Headers) -> is_content_type(Headers, <<"text/html">>).
 is_text(Headers) -> is_content_type(Headers, <<"text/plain">>).
+is_form(Headers) -> is_content_type(Headers, <<"application/x-www-form-urlencoded">>).
 
 select_content_type(<<"application/json">>) -> json;
 select_content_type(<<"text/html">>) -> html;
 select_content_type(<<"text/plain">>) -> text;
-select_content_type(undefined) -> json;
+select_content_type(<<"application/x-www-form-urlencoded">>) -> form;
+select_content_type(undefined) -> text;
 select_content_type(ContentType) -> ContentType.
 
 get_content_type_atom(Headers) ->
@@ -41,6 +48,29 @@ get_content_type(Headers) ->
 		_ -> undefined
 	end.
 
+get_accept_atom(Headers) ->
+	case maps:is_key(<<"accept">>, Headers) of
+		true -> select_content_type(maps:get(<<"accept">>, Headers));
+		_ -> select_content_type(undefined)
+	end.
+
+get_accept(Headers) ->
+	case maps:is_key(<<"accept">>, Headers) of
+		true -> maps:get(<<"accept">>, Headers);
+		_ -> undefined
+	end.
+
+get_response_type_atom(Headers) ->
+	case get_content_type_atom(Headers) of
+		undefined -> get_accept_atom(Headers);
+		Value -> Value
+	end.
+
+get_response_type(Headers) ->
+	case get_content_type(Headers) of
+		undefined -> get_accept(Headers);
+		Value -> Value
+	end.
 
 sprint(Fmt, []) -> lists:flatten(Fmt);
 

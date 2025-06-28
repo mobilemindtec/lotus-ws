@@ -8,6 +8,17 @@
 
 % rebar3 eunit --module=lotus_ws_handler_test --sys_config=test/test.config 
 
+myroute("/test", #req{ body = <<"ping">> }) ->
+	{ok, {text, <<"pong">>}}.
+
+myroute_any(#req{ body = <<"ping">> }) ->
+	{ok, {text, <<"pong">>}}.
+
+post("/test", #req{ body = <<"ping">> }) ->
+	{ok, {text, <<"pong">>}}.
+
+get(#req{ body = <<"ping">> }) ->
+	{ok, {text, <<"pong">>}}.
 
 setup() -> 
 	ok.
@@ -15,87 +26,219 @@ setup() ->
 cleanup(_) ->
 	ok.
 
+%  rebar3 eunit --module=lotus_ws_handler_test  --sys_config=test/test.config
 handler_test_() ->
 	
 	{setup, 
 		fun setup/0,
 		fun cleanup/1,
 		[
-			?_test(handler_login_success()),
-			?_test(handler_login_failure()),
-			?_test(handler_auth_and_enter_auth_route())
+			?_test(handler_route_not_found())
+			, ?_test(handler_route_func())
+			, ?_test(handler_route_mod_func())
+			, ?_test(handler_route_mod_func_any())
+			, ?_test(handler_route_mod())
+			, ?_test(handler_route_mod_any())
+			, ?_test(handler_route_func_not_found_with_invalid_guard())
+			, ?_test(handler_route_func_with_enter_middleware())
+			, ?_test(handler_route_func_with_leave_middleware())
+			, ?_test(handler_route_func_with_enter_and_leave_middleware())
 			]}.
 
-
-%  rebar3 eunit --test=lotus_ws_handler_test:handler_login_success_test  --sys_config=test/test.config
-handler_login_success() ->
-	Router = #router {
-			authenticator = data_test:default_authenticator(),
-			routes = [
-				data_test:login_route()
-				]},
+handler_route_not_found() ->
+	Router = #router{debug = true},
 	{ok, Pid} = lotus_ws_router:start(Router),
-	LoginCtx = lotus_ws_handler:prepare_ctx(data_test:login_ctx("test123")),
-	#ctx{ resp = Resp } = lotus_ws_handler:run_ctx(LoginCtx),
+	Req = #req { method = post, path = "/test", body = <<"ping">> }, 
+	#ctx{ resp = Resp } = lotus_ws_handler:handle(Req),
 	lotus_ws_router:stop(Pid),
-	?assert(Resp#resp.status =:= 200).
+	?assertEqual(Resp#resp.status, 404),
+	?assertEqual(Resp#resp.body, "Not Found").
 
-%  rebar3 eunit --test=lotus_ws_handler_test:handler_login_failure_test  --sys_config=test/test.config
-handler_login_failure() ->
-	
-	Router = #router {
-			authenticator = data_test:default_authenticator(),
-			routes = [
-				data_test:login_route()
+%  rebar3 eunit --test=lotus_ws_handler_test:handler_route_func  --sys_config=test/test.config
+handler_route_func() ->
+	Router = #router{
+			debug = true
+			, routes = [
+				#route {
+					path = "/test"
+					, handler = fun(_Req=#req{ body = <<"ping">>}) ->
+							#resp { status = 200, body = <<"pong">>}
+					end
+					}
 				]
-			},
+			},	
 	{ok, Pid} = lotus_ws_router:start(Router),
-	LoginCtx = lotus_ws_handler:prepare_ctx(data_test:login_ctx("test")),
-	#ctx{ resp = Resp } = lotus_ws_handler:run_ctx(LoginCtx),
+	Req = #req { method = post, path = "/test", body = <<"ping">> }, 
+	#ctx{ resp = Resp } = lotus_ws_handler:handle(Req),
 	lotus_ws_router:stop(Pid),
-	?assert(Resp#resp.status =:= 401).
+	?assertEqual(Resp#resp.status, 200),
+	?assertEqual(Resp#resp.body, <<"pong">>).
+
+handler_route_mod_func() ->
+	Router = #router{
+			debug = true
+			, routes = [
+				#route {
+					path = "/test"
+					, handler = {lotus_ws_handler_test, myroute}
+					}
+				]
+			},	
+	{ok, Pid} = lotus_ws_router:start(Router),
+	Req = #req { method = post, path = "/test", body = <<"ping">> }, 
+	#ctx{ resp = Resp } = lotus_ws_handler:handle(Req),
+	lotus_ws_router:stop(Pid),
+	?assertEqual(Resp#resp.status, 200),
+	?assertEqual(Resp#resp.body, <<"pong">>).
+
+handler_route_mod_func_any() ->
+	Router = #router{
+			debug = true
+			, routes = [
+				#route {
+					path = "/test"
+					, handler = {lotus_ws_handler_test, myroute_any}
+					}
+				]
+			},	
+	{ok, Pid} = lotus_ws_router:start(Router),
+	Req = #req { method = get, path = "/test", body = <<"ping">> }, 
+	#ctx{ resp = Resp } = lotus_ws_handler:handle(Req),
+	lotus_ws_router:stop(Pid),
+	?assertEqual(Resp#resp.status, 200),
+	?assertEqual(Resp#resp.body, <<"pong">>).
+
+handler_route_mod() ->
+	Router = #router{
+			debug = true
+			, routes = [
+				#route {
+					path = "/test"
+					, handler = lotus_ws_handler_test
+					}
+				]
+			},	
+	{ok, Pid} = lotus_ws_router:start(Router),
+	Req = #req { method = post, path = "/test", body = <<"ping">> }, 
+	#ctx{ resp = Resp } = lotus_ws_handler:handle(Req),
+	lotus_ws_router:stop(Pid),
+	?assertEqual(Resp#resp.status, 200),
+	?assertEqual(Resp#resp.body, <<"pong">>).
+
+handler_route_mod_any() ->
+	Router = #router{
+			debug = true
+			, routes = [
+				#route {
+					path = "/test"
+					, handler = lotus_ws_handler_test
+					}
+				]
+			},	
+	{ok, Pid} = lotus_ws_router:start(Router),
+	Req = #req { method = get, path = "/test", body = <<"ping">> }, 
+	#ctx{ resp = Resp } = lotus_ws_handler:handle(Req),
+	lotus_ws_router:stop(Pid),
+	?assertEqual(Resp#resp.status, 200),
+	?assertEqual(Resp#resp.body, <<"pong">>).
+
+handler_route_func_not_found_with_invalid_guard() ->
+	Router = #router{
+			debug = true
+			, routes = [
+				#route {
+					path = "/test"
+					, handler = fun(_Req=#req{ body = <<"ping">>}) ->
+							#resp { status = 200, body = <<"pong">>}
+					end
+					}
+				]
+			},	
+	{ok, Pid} = lotus_ws_router:start(Router),
+	Req = #req { method = post, path = "/test", body = <<"ping-invalid">> }, 
+	#ctx{ resp = Resp } = lotus_ws_handler:handle(Req),
+	lotus_ws_router:stop(Pid),
+	?assertEqual(Resp#resp.status, 404),
+	?assertEqual(Resp#resp.body, "Not Found").	
 
 
-handler_auth_and_enter_auth_route() ->
-	
-	Router = #router {				
-			authenticator = data_test:default_authenticator(),
-			routes = [#route {
-					path = "/",
-					routes = [
-						data_test:login_route(),					
-						#route {
-							path = "/api/user/me",
-							middlewares = [lotus_ws_bearer_token_auth_mw],
-							handler_fn  = fun(_) -> 
-									{200, [{json, [{status, "success"}]}]} 
+handler_route_func_with_enter_middleware() ->
+	Router = #router{
+			debug = true
+			, routes = [
+				#route {
+					path = "/test"
+					, middlewares = [
+						#middleware {
+							enter = fun(Req=#req{ body = <<"ping">> }) ->
+									Req#req { body = <<"ping changed">> }
 							end
 							}
 						]
+					, handler = fun(_Req=#req{ body = <<"ping changed">>}) ->
+							#resp { status = 200, body = <<"pong">>}
+					end
 					}
-				
-				]},
-	
+				]
+			},	
 	{ok, Pid} = lotus_ws_router:start(Router),
-	
-	
-	LoginCtxFail = lotus_ws_handler:prepare_ctx(data_test:login_ctx("test")),
-	#ctx{ resp = RespAuthFail } = lotus_ws_handler:run_ctx(LoginCtxFail),	
-	%?debugFmt("RespAuthFail = ~p", [RespAuthFail]),
-	?assert(RespAuthFail#resp.status =:= 401),
-	
-	LoginCtxSuccess = lotus_ws_handler:prepare_ctx(data_test:login_ctx("test123")),
-	#ctx{ resp = RespAuthSuccess } = lotus_ws_handler:run_ctx(LoginCtxSuccess),	
-	%?debugFmt("RespAuthSuccess = ~p", [RespAuthSuccess]),
-	
-	UserMeWithInvalidTokenCtx = lotus_ws_handler:prepare_ctx(data_test:user_me_ctx(<<"xxxxxxx">>)),
-	#ctx{ resp = RespAuthTokenFail } = lotus_ws_handler:run_ctx(UserMeWithInvalidTokenCtx),
-	%?debugFmt("RespAuthTokenFail = ~p", [RespAuthTokenFail]),
-	?assert(RespAuthTokenFail#resp.status =:= 401),
-	
-	#{ <<"access_token">> := AccessToken } = jsx:decode(RespAuthSuccess#resp.body),
-	UserMeWithValidTokenCtx = lotus_ws_handler:prepare_ctx(data_test:user_me_ctx(AccessToken)),
-	#ctx{ resp = RespAuthTokenSuccess } = lotus_ws_handler:run_ctx(UserMeWithValidTokenCtx),
-	%?debugFmt("RespAuthTokenSuccess = ~p", [RespAuthTokenSuccess]),
+	Req = #req { method = post, path = "/test", body = <<"ping">> }, 
+	#ctx{ resp = Resp } = lotus_ws_handler:handle(Req),
 	lotus_ws_router:stop(Pid),
-	?assert(RespAuthTokenSuccess#resp.status =:= 200).	
+	?assertEqual(Resp#resp.status, 200),
+	?assertEqual(Resp#resp.body, <<"pong">>).
+
+handler_route_func_with_leave_middleware() ->
+	Router = #router{
+			debug = true
+			, routes = [
+				#route {
+					path = "/test"
+					, middlewares = [
+						#middleware {
+							leave = fun(#req{}, Resp=#resp{ body = <<"pong">>}) ->
+									Resp#resp { body = <<"pong changed">> }
+							end
+							}
+						]
+					, handler = fun(_Req=#req{ body = <<"ping">>}) ->
+							#resp { status = 200, body = <<"pong">>}
+					end
+					}
+				]
+			},	
+	{ok, Pid} = lotus_ws_router:start(Router),
+	Req = #req { method = post, path = "/test", body = <<"ping">> }, 
+	#ctx{ resp = Resp } = lotus_ws_handler:handle(Req),
+	lotus_ws_router:stop(Pid),
+	?assertEqual(Resp#resp.status, 200),
+	?assertEqual(Resp#resp.body, <<"pong changed">>).	
+
+handler_route_func_with_enter_and_leave_middleware() ->
+	Router = #router{
+			debug = true
+			, routes = [
+				#route {
+					path = "/test"
+					, middlewares = [
+						#middleware {							
+							enter = fun(Req=#req{ body = <<"ping">> }) ->
+									Req#req { body = <<"ping changed">> }
+							end
+							, leave = fun(#req{}, Resp=#resp{ body = <<"pong">>}) ->
+									Resp#resp { body = <<"pong changed">> }
+							end
+							}
+						]
+					, handler = fun(_Req=#req{ body = <<"ping changed">>}) ->
+							#resp { status = 200, body = <<"pong">>}
+					end
+					}
+				]
+			},	
+	{ok, Pid} = lotus_ws_router:start(Router),
+	Req = #req { method = post, path = "/test", body = <<"ping">> }, 
+	#ctx{ resp = Resp } = lotus_ws_handler:handle(Req),
+	lotus_ws_router:stop(Pid),
+	?assertEqual(Resp#resp.status, 200),
+	?assertEqual(Resp#resp.body, <<"pong changed">>).		

@@ -8,14 +8,21 @@
 	stop/1,
 	start_link/1,
 	init/1,
-	handle_call/3
+	handle_call/3,
+	handle_cast/2, 
+	handle_info/2, 
+	terminate/2, 
+	code_change/3
 	]).
 
--export([ find_route/2
+-export([ 
+	find_route/2
 	, compile_router/1
-	, search/1
-	, get_authenticator/0
-	, get_middlewares/0]).
+	, match/1
+	, get_interceptors/0
+	, get_recover/0
+	, get_debug/0
+	, get_router/0]).
 
 -record(state, { router :: router() }).
 
@@ -37,57 +44,27 @@ map_route_to_record(R) ->
 	#route{
 		name = maps:get(name, R, Handler),
 		path = maps:get(path, R, undefined),
-		handler_fn =  maps:get(handler_fn, R, undefined),
 		handler = Handler,
-		middlewares = extract_middlewares(Middlewares),
+		middlewares = Middlewares,
 		roles = maps:get(roles, R, []),
 		routes = map_routes_to_record(maps:get(routes, R, []))		
 		}.
-
-extract_middlewares(Middlewares) when is_map(Middlewares) ->
-	#middlewares{
-		values = maps:get(values, Middlewares, []),
-		ignore = maps:get(ignore, Middlewares, []),
-		handlers = [map_middleware_to_record(X) || X <- maps:get(handlers, Middlewares, [])]
-		};
-extract_middlewares(Middlewares) when is_list(Middlewares) ->
-	[map_middleware_to_record(X) || X <- Middlewares].
 
 map_routes_to_record(Routes) -> map_routes_to_record(Routes, []).
 map_routes_to_record([], Results) -> Results;
 map_routes_to_record([H| T], Results) ->
 	map_routes_to_record(T, Results++[map_route_to_record(H)]).
 
-map_middleware_to_record(Middleware) when is_atom(Middleware) ->
-	Middleware;
-map_middleware_to_record(Middleware) when is_map(Middleware) ->
-	Handler = maps:get(handler, Middleware, undefined),
-	#middleware{
-		name = maps:get(name, Middleware, Handler),
-		description = maps:get(description, Middleware, ""),
-		enter = maps:get(enter, Middleware, undefined),
-		leave = maps:get(leave, Middleware, undefined),
-		error = maps:get(error, Middleware, undefined),
-		handler = Handler
-		}.
-
-map_middlewares_to_record(Middlewares) ->
-	#middlewares{
-		values = maps:get(values, Middlewares, []),
-		ignore = maps:get(ignore, Middlewares, []),
-		handlers = maps:get(handlers, Middlewares, [])
-		}.
-
 map_router_to_record(Router) when is_map(Router) ->
 	Routes = maps:get(routes, Router, []),
 	Debug = maps:get(debug, Router, false),
-	Middlewares = maps:get(middlewares, Router, #{}),
-	Authenticator = maps:get(authenticator, Router, undefined),
+	Interceptors = maps:get(interceptors, Router, []),
+	Recover = maps:get(recover, Router, undefined),
 	#router{
-		routes = map_routes_to_record(Routes),
-		debug = Debug,
-		middlewares  = map_middlewares_to_record(Middlewares),
-		authenticator = Authenticator
+		routes = map_routes_to_record(Routes)
+		,debug = Debug
+		, recover = Recover
+		, interceptors = Interceptors
 		}.
 
 init(Router) when is_map(Router) ->
@@ -112,29 +89,43 @@ call(Args) ->
 			{error, "pid not found"}
 	end.
 
-search(Path) ->
-	call({search, Path}).
+match(Path) ->
+	call({match, Path}).
 
-get_authenticator() ->
-	call(get_authenticator).
+get_recover() ->
+	call(get_recover).
 
-get_middlewares() ->
-	call(get_middlewares).
+get_interceptors() ->
+	call(get_interceptors).
+
+get_debug() ->
+	call(get_debug).
+
+get_router() ->
+	call(get_router).
 
 %% events
 
-handle_call({search, Path}, _From, State) ->
+handle_call({match, Path}, _From, State) ->
 	Router = State#state.router,
 	Result = find_route(Path, Router#router.routes),
 	{reply, Result, State};
 
-handle_call(get_authenticator, _From, State) ->
-	Router = State#state.router,
-	{reply, Router#router.authenticator, State};
+handle_call(get_recover, _From, State) ->
+	Router = State#state.router,	
+	{reply, {ok, Router#router.recover}, State};
 
-handle_call(get_middlewares, _From, State) ->
-	Router = State#state.router,
-	{reply, Router#router.middlewares, State};
+handle_call(get_interceptors, _From, State) ->
+	Router = State#state.router,	
+	{reply, {ok, Router#router.interceptors}, State};
+
+handle_call(get_debug, _From, State) ->
+	Router = State#state.router,	
+	{reply, {ok, Router#router.debug}, State};
+
+handle_call(get_router, _From, State) ->
+	Router = State#state.router,	
+	{reply, {ok, Router}, State};
 
 handle_call(Event, _From, State) ->
 	logger:debug("event ~p not handled", [Event]),
@@ -142,45 +133,30 @@ handle_call(Event, _From, State) ->
 
 %% private
 
-combine_middewares(#middlewares{} = LastMiddlewares, CurrMiddlewares) when is_list(CurrMiddlewares) ->
-	combine_middewares(LastMiddlewares, #middlewares{ handlers = CurrMiddlewares });
-
-combine_middewares(#middlewares{} = LastMiddlewares, #middlewares{} = CurrMiddlewares) ->
-	Ignore = LastMiddlewares#middlewares.ignore++CurrMiddlewares#middlewares.ignore,
-	Values = LastMiddlewares#middlewares.values++CurrMiddlewares#middlewares.values,
-	Handlers = LastMiddlewares#middlewares.handlers++CurrMiddlewares#middlewares.handlers,
-	#middlewares{ 
-		ignore = Ignore,
-		values = lotus_ws_utils:list_in_list_not(fun(X, Y) -> X =:= Y end, Values, Ignore),
-		handlers = lotus_ws_utils:list_in_list_not(fun(X, Y) -> X =:= Y end, Handlers, Ignore)
-		}.
-
 create_full_route(#route{} = Route) -> 	
-	create_full_route([Route], "", [], #middlewares{}).
+	create_full_route([Route], "", [], []).
 
 create_full_route([], _, FullRoutes, _) -> FullRoutes;
 
-create_full_route(Routes, "/", FullRoutes, #middlewares{} = Middlewares) ->
+create_full_route(Routes, "/", FullRoutes, Middlewares) ->
 	create_full_route(Routes, "", FullRoutes, Middlewares);
 
-create_full_route([Route|NextRoutes], Path, FullRoutes, #middlewares{} = Middlewares) ->
+create_full_route([Route|NextRoutes], Path, FullRoutes, Middlewares) ->
 	
 	RouteMiddlewares = Route#route.middlewares,
-	InvalidHandler = Route#route.handler_fn =/= undefined andalso Route#route.handler =/= undefined,
-	EmptyHandler = Route#route.handler_fn =:= undefined andalso Route#route.handler =:= undefined,
+	EmptyHandler = Route#route.handler =:= undefined,
 	EmptyRouteChildren = length(Route#route.routes) =:= 0,
 	RoutePath = Path++Route#route.path,
+	CombinedMiddlewares = Middlewares ++ RouteMiddlewares,
 	
 	%?debugFmt("create_full_route ~p, subroutes = ~p", [RoutePath, length(Route#route.routes)]),
 	
 	RouteFullPath = if 
 		EmptyHandler andalso  EmptyRouteChildren ->
-			{badroute, {Route#route.name, "invalid handler, use fn or handler"}};
-		InvalidHandler ->
-			{badroute, {Route#route.name, "invalid handler, use fn or handler"}};
+			{badroute, {Route#route.name, io:format("Invalid route handler. Route: ~p", [RoutePath])}};
 		not EmptyHandler ->
 			%% ?debugFmt("new route ~p, middlewares = ~p, middlewares parent = ~p", [RoutePath, RouteMiddlewares, Middlewares]),
-			Route#route { path = RoutePath, middlewares = combine_middewares(Middlewares, RouteMiddlewares) };
+			Route#route { path = RoutePath, middlewares = CombinedMiddlewares };
 		true ->
 			noroute
 	end,
@@ -193,9 +169,9 @@ create_full_route([Route|NextRoutes], Path, FullRoutes, #middlewares{} = Middlew
 		{noroute, Reason1} -> 
 			{noroute, Reason1};
 		noroute ->
-			create_full_route(Route#route.routes, RoutePath, [], combine_middewares(Middlewares, RouteMiddlewares));
+			create_full_route(Route#route.routes, RoutePath, [], CombinedMiddlewares);
 		RouteCompiled ->
-			SubRoutes = create_full_route(Route#route.routes, RoutePath, [], combine_middewares(Middlewares, RouteMiddlewares)),
+			SubRoutes = create_full_route(Route#route.routes, RoutePath, [], CombinedMiddlewares),
 			[RouteCompiled] ++ SubRoutes
 	end,
 	
@@ -208,6 +184,7 @@ create_full_route([Route|NextRoutes], Path, FullRoutes, #middlewares{} = Middlew
 			{noroute, Reason3};
 		CRoute ->
 			%?debugFmt("next route to ~p, routes = ~p", [Path, length(NextRoutes)]),
+			% no route, go to next route
 			create_full_route(NextRoutes, Path, FullRoutes++CRoute, Middlewares)
 	end.
 
@@ -229,6 +206,9 @@ compile_router(#router{routes=[H|T]} = Router, FullRoutes) ->
 find_route(_, []) -> nomatch;
 
 find_route(Path, [Route|T]) -> 
+	
+	%logger:info("check ~p =:= ~p", [Route#route.path, Path]),
+	
 	case extract_path_params(Route#route.path, Path) of
 		nomatch ->
 			%logger:debug("route ~p not math with ~p", [Path, Route#route.path]),
@@ -303,3 +283,8 @@ validate_path_param(Regexp, Param) ->
 					end
 			end
 	end.
+
+handle_cast(_Msg, State) -> {noreply, State}.
+handle_info(_Info, State) -> {noreply, State}.
+terminate(_Reason, _State) -> ok.
+code_change(_OldVsn, State, _Extra) -> {ok, State}.
