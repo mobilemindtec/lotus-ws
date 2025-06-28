@@ -34,6 +34,7 @@ handler_test_() ->
 		fun cleanup/1,
 		[
 			?_test(handler_route_not_found())
+			, ?_test(handler_route_server_error())
 			, ?_test(handler_route_func())
 			, ?_test(handler_route_mod_func())
 			, ?_test(handler_route_mod_func_any())
@@ -53,6 +54,25 @@ handler_route_not_found() ->
 	lotus_ws_router:stop(Pid),
 	?assertEqual(Resp#resp.status, 404),
 	?assertEqual(Resp#resp.body, "Not Found").
+
+handler_route_server_error() ->
+	Router = #router{
+			debug = true
+			, routes = [
+				#route {
+					path = "/test"
+					, handler = fun(_Req=#req{ body = <<"ping">>}) ->
+							throw(unknown_error)
+					end
+					}
+				]
+			},	
+	{ok, Pid} = lotus_ws_router:start(Router),
+	Req = #req { method = post, path = "/test", body = <<"ping">> }, 
+	#ctx{ resp = Resp } = lotus_ws_handler:handle(Req),
+	lotus_ws_router:stop(Pid),
+	?assertEqual(Resp#resp.status, 500),
+	?assertEqual(Resp#resp.body, "Server Error").
 
 %  rebar3 eunit --test=lotus_ws_handler_test:handler_route_func  --sys_config=test/test.config
 handler_route_func() ->
