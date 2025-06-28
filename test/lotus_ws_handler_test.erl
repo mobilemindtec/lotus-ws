@@ -35,6 +35,8 @@ handler_test_() ->
 		[
 			?_test(handler_route_not_found())
 			, ?_test(handler_route_server_error())
+			, ?_test(handler_route_error_recover())		
+			, ?_test(handler_route_intercept())			
 			, ?_test(handler_route_func())
 			, ?_test(handler_route_mod_func())
 			, ?_test(handler_route_mod_func_any())
@@ -72,7 +74,53 @@ handler_route_server_error() ->
 	#ctx{ resp = Resp } = lotus_ws_handler:handle(Req),
 	lotus_ws_router:stop(Pid),
 	?assertEqual(Resp#resp.status, 500),
-	?assertEqual(Resp#resp.body, "Server Error").
+	?assertEqual(Resp#resp.body, "Server Error. Detail: unknown_error").
+
+handler_route_error_recover() ->
+	Router = #router{
+			debug = true
+			, recover = fun(#req{}, _) ->
+					{ok, {text, "recovered"}}
+			end
+			, routes = [
+				#route {
+					path = "/test"
+					, handler = fun(_Req=#req{ body = <<"ping">>}) ->
+							throw(unknown_error)
+					end
+					}
+				]
+			},	
+	{ok, Pid} = lotus_ws_router:start(Router),
+	Req = #req { method = post, path = "/test", body = <<"ping">> }, 
+	#ctx{ resp = Resp } = lotus_ws_handler:handle(Req),
+	lotus_ws_router:stop(Pid),
+	?assertEqual(Resp#resp.status, 200),
+	?assertEqual(Resp#resp.body, "recovered").
+
+handler_route_intercept() ->
+	Router = #router{
+			debug = true
+			, interceptors = [
+				fun(500, #req{}, _) ->
+						{ok, {text, "intercepted"}}
+				end
+				]
+			, routes = [
+				#route {
+					path = "/test"
+					, handler = fun(_Req=#req{ body = <<"ping">>}) ->
+							throw(unknown_error)
+					end
+					}
+				]
+			},	
+	{ok, Pid} = lotus_ws_router:start(Router),
+	Req = #req { method = post, path = "/test", body = <<"ping">> }, 
+	#ctx{ resp = Resp } = lotus_ws_handler:handle(Req),
+	lotus_ws_router:stop(Pid),
+	?assertEqual(Resp#resp.status, 200),
+	?assertEqual(Resp#resp.body, "intercepted").	
 
 %  rebar3 eunit --test=lotus_ws_handler_test:handler_route_func  --sys_config=test/test.config
 handler_route_func() ->

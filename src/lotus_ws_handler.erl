@@ -75,14 +75,13 @@ handle(Ctx = #ctx{ req = Req }) ->
 				error:function_clause ->
 					if 
 						Debug ->
-							logger:debug("Route handler error: function_clause");
+							logger:error("Route handler error: function_clause");
 						true -> ok
 					end,
 					lotus_ws_http_utils:handle_resp(Ctx, lotus_ws_http_utils:not_found(Req#req.headers));
 				
 				Error ->
-					logger:debug("Route handler error: ~p", [Error]),
-					case dispatch_recover(Recover, Ctx, Error) of
+					case dispatch_recover(Recover, Req, Error) of
 						#req{} ->
 							lotus_ws_http_utils:handle_resp(Ctx, lotus_ws_http_utils:server_error(Req#req.headers, Error));
 						Recovered ->
@@ -90,10 +89,7 @@ handle(Ctx = #ctx{ req = Req }) ->
 					end			
 			end,
 			NewCtx0 = dispatch_middwares(Middlewares, NewCtx, leave),
-			#ctx{req = NewReq, resp = NewResp} = NewCtx0,
-			NewResp0 = dispatch_interceptors(Interceptors, NewReq, NewResp),
-			NewCtx0#ctx { resp = NewResp0 };
-		
+			dispatch_interceptors(Interceptors, NewCtx0);					
 		NoRoute ->
 			if 
 				Debug ->
@@ -104,8 +100,9 @@ handle(Ctx = #ctx{ req = Req }) ->
 			lotus_ws_http_utils:handle_resp(Ctx, lotus_ws_http_utils:not_found(Req#req.headers))
 	end.
 
-dispatch_interceptors([], _, Resp) -> Resp;
-dispatch_interceptors([H|T], Req=#req{}, Resp=#resp{status = StatusCode}) -> 
+dispatch_interceptors([], Ctx) -> Ctx;
+dispatch_interceptors([H|T], Ctx=#ctx{ req = Req, resp = Resp }) -> 
+	StatusCode = Resp#resp.status,
 	NewResp = case H of
 		{Status, Mod, Fun} when Status =:= StatusCode -> 
 			case lotus_ws_utils:find_module_fn(Mod, Fun) of
@@ -136,8 +133,8 @@ dispatch_interceptors([H|T], Req=#req{}, Resp=#resp{status = StatusCode}) ->
 			logger:warning("Wrong interceptor: ~p", [Other]),
 			Resp
 	end,
-	HandledResp = lotus_ws_http_utils:handle_resp(NewResp),
-	dispatch_interceptors(T, Req, HandledResp).
+	NewCtx = lotus_ws_http_utils:handle_resp(Ctx, NewResp),
+	dispatch_interceptors(T, NewCtx).
 
 
 dispatch_recover(undefined, Req=#req{}, _) -> Req;

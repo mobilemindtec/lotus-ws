@@ -18,8 +18,12 @@
 	binary_to_string/1,
 	get_env/2,
 	get_response_type/1,
-	get_response_type_atom/1
+	get_response_type_atom/1,
+	format/2
 	]).
+
+format(Str, Args) ->
+	lists:flatten(io_lib:format(Str, Args)).
 
 is_content_type(Headers, ContentType) ->
 	maps:is_key(<<"content-type">>, Headers) andalso maps:get(<<"content-type">>) =:= ContentType.

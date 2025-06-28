@@ -52,8 +52,8 @@ not_found(_) -> 404.
 server_error(Headers) -> server_error(Headers, "").
 server_error(Headers, ErrorDetail) when is_map(Headers) -> server_error(response_type(Headers), ErrorDetail);
 server_error(Headers, ErrorDetail) when is_map(Headers) -> server_error(response_type(Headers), ErrorDetail);
-server_error(json, ErrorDetail) -> {500, [{json, [{message, "Server Error"}, {detail, ErrorDetail}]}]};
-server_error(text, ErrorDetail) -> {500, [{text, "Server Error. Detail: " ++ ErrorDetail}]};
+server_error(json, ErrorDetail) -> {500, {json, [{message, "Server Error"}, {detail, ErrorDetail}]}};
+server_error(text, ErrorDetail) -> {500, {text, lotus_ws_utils:format("Server Error. Detail: ~p", [ErrorDetail])}};
 server_error(html, ErrorDetail) ->
 	Html = html_tpl:html(
 			html_tpl:body([
