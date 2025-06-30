@@ -40,12 +40,13 @@ start_link(Router) ->
 
 map_route_to_record(R) ->
 	Handler = maps:get(handler, R, undefined),
-	Middlewares = maps:get(middlewares, R, []),
+	Middlewares0 = maps:get(middlewares, R, []),
+	Middlewares1 = prepare_middlewares(Middlewares0),
 	#route{
 		name = maps:get(name, R, Handler),
 		path = maps:get(path, R, undefined),
 		handler = Handler,
-		middlewares = Middlewares,
+		middlewares = Middlewares1,
 		roles = maps:get(roles, R, []),
 		routes = map_routes_to_record(maps:get(routes, R, []))		
 		}.
@@ -132,6 +133,15 @@ handle_call(Event, _From, State) ->
 	{reply, {error, "event not found"}, State}.
 
 %% private
+
+prepare_middlewares(Middlewares) ->
+	lists:map(
+		fun(MD=#middleware{}) -> MD;			
+			({Type, Module, Func}) -> #middleware { handler = {Type, Module, Func} };
+			(Handler) when is_atom(Handler) -> #middleware { handler = Handler};
+			(Handler) -> throw(lotus_ws_utils:format("Invalid middleware handler: ~p", [Handler])) 
+		end, 
+		Middlewares).
 
 create_full_route(#route{} = Route) -> 	
 	create_full_route([Route], "", [], []).

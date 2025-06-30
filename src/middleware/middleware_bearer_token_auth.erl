@@ -1,5 +1,5 @@
 -module(middleware_bearer_token_auth).
--include("include/lotus_ws.hrl").
+-include("../include/lotus_ws.hrl").
 
 %%
 %% Middleware to auth bearer token authorization
@@ -10,9 +10,6 @@
 	]).
 
 unauthorized() -> {401, [{json, [{message, "unauthorized"}]}]}.
-
-route_roles(#route{ roles = Roles }) -> Roles;
-route_roles(_) -> [].
 
 default_configs() ->
 	[
@@ -42,18 +39,18 @@ validate_roles(_, #auth{ roles = [] }) -> false;
 validate_roles(RouteRoles, #auth{ roles = AuthRoles }) -> 
 	lotus_ws_utils:list_in_list_any(fun(X, Y) -> X =:= Y end, AuthRoles, RouteRoles).	
 
-next(Ctx=#ctx{req = Req}, Auth, true) -> Ctx#ctx { req = Req#req{ auth = Auth }};
+next(Req, Auth, true) -> Req#req{ auth = Auth };
 next(_, _, false) -> unauthorized().
 
-enter(#ctx{ route = Route, req = #req { headers = Headers }} = Ctx) -> 
+enter(Req=#req { headers = Headers, auth = #auth { roles = Roles } }) -> 
 	%?debugMsg("enter"),
 	Configs = lotus_ws_utils:get_env(bearer_token, default_configs()),
 	Key = get_config(key, Configs),
 	Token = parse_token(maps:get(<<"authorization">>, Headers, undefined)),
 	Claims = decode_token(Token, Key),
 	Auth = auth_result(Claims),
-	Validate = validate_roles(route_roles(Route), Auth),
+	Validate = validate_roles(Roles, Auth),
 	%logger:debug("Token ~p, ~p", [Token, Auth]),
-	next(Ctx, Auth, Validate);
+	next(Req, Auth, Validate);
 
 enter(_) -> unauthorized().

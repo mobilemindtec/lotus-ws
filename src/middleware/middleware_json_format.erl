@@ -1,22 +1,21 @@
 -module(middleware_json_format).
--include("include/lotus_ws.hrl").
+-include("../include/lotus_ws.hrl").
 
 %%
 %% Middleware to process json request and response
 %%
 
 -export([
-	leave/1
+	leave/2
 	]).
 
 error() -> {500, [{json, [{error, <<"invalid json data">>}]}]}.
 
-format(Ctx, _, undefined) -> Ctx;
+format(Resp, _, undefined) -> Resp;
 format(_, false, _) -> error();
-format(#ctx{ resp = Resp} = Ctx, true, Body) -> 
-	Ctx#ctx{ resp = Resp#resp { body = jsx:encode(Body)} }.
+format(Resp, true, Body) -> 
+	Resp#resp { body = jsx:encode(Body) }.
 
 
-leave(#ctx{ resp = #resp { body = Body }} = Ctx) -> 
-	%?debugMsg("leave"),
-	format(Ctx, jsx:is_term(Body), Body).
+leave(_, Resp=#resp { body = Body }) -> 
+	format(Resp, jsx:is_term(Body), Body).

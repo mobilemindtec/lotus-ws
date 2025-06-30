@@ -6,6 +6,14 @@
 -define(CONTENT_TYPE_TEXT, #{<<"content-type">> => <<"text/plain">>}).
 -define(CONTENT_TYPE_HTML, #{<<"content-type">> => <<"text/html">>}).
 
+-record(auth, {
+		username :: string()
+		, token :: string()
+		, roles = [] :: list(atom())
+		, data = #{} :: map()}).
+
+-type auth() :: #auth{}.
+
 
 -record(req, {
 		body :: any()
@@ -14,9 +22,11 @@
 		, headers = #{} :: map()	
 		, params = #{} :: map()
 		, queries = #{} :: map()
-		, auth :: auth()
+		, auth = #auth{} :: auth()
 		, data = #{} :: map()
-		, req :: cowboy_req:req()}).
+		, req :: cowboy_req:req()
+		, route :: route()
+		}).
 
 -type req() :: #req{}.
 
@@ -28,14 +38,6 @@
 -type resp() :: #resp{}.
 
 
--record(auth, {
-		username :: string()
-		, token :: string()
-		, roles = [] :: list(atom())
-		, data = #{} :: map()}).
-
--type auth() :: #auth{}.
-
 -record(login, {
 		username :: string()
 		, password :: string()}).
@@ -45,7 +47,7 @@
 -record(ctx, {
 		req = undefined :: req()
 		,	resp = undefined :: resp()
-		,	route :: route()}).
+		}).
 
 -type ctx() :: #ctx{}.
 

@@ -11,10 +11,11 @@ str_to_bin_map([], _, Acc) -> Acc;
 str_to_bin_map([K|T], Map, Acc) ->
 	Val = maps:get(K, Map),
 	NewVal = case Val of
-		V when is_map(V) -> str_to_bin_map(V);
+		V when is_map(V) -> str_to_bin_map(V);	
+		V when is_list(V) -> [string_to_bin(X) || X <- V];
 		_ -> Val
 	end,
-	NewMap = maps:merge(Acc, #{string_to_bin(K) => string_to_bin(NewVal)}),
+	NewMap = maps:merge(Acc, #{string_to_bin(K) => NewVal}),
 	str_to_bin_map(T, Map, NewMap).
 
 str_to_bin(List) -> str_to_bin(List, []).

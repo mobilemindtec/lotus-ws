@@ -22,13 +22,14 @@ init(Req, State) ->
 
 
 create_ctx(#{path := Path, method := Method, headers := Headers} = Req) ->	
-	M = lotus_ws_utils:binary_to_string(Path),
+	M1 = lotus_ws_utils:binary_to_string(Method),
+	M2 = list_to_atom(string:lowercase(M1)),	
 	#ctx {
 		req = #req{ 
 			path = lotus_ws_utils:binary_to_string(Path), 
 			body = lotus_ws_http_utils:get_cowboy_req_body(Req), 
 			req = Req, 
-			method = binary_to_atom(string:lowercase(M)),
+			method = M2,
 			queries = cowboy_req:parse_qs(Req),			
 			headers = Headers}}.
 
@@ -50,18 +51,17 @@ handle(Ctx = #ctx{ req = Req }) ->
 	case lotus_ws_router:match(Req#req.path) of
 		Route=#route{} ->
 			
-			{ok, Interceptors} = lotus_ws_router:get_interceptors(),
-			{ok, Recover} = lotus_ws_router:get_recover(),
+			{ok, #router{
+					interceptors = Interceptors
+					, recover = Recover					
+					}} = lotus_ws_router:get_router(),
 			
-			%logger:debug("route found: ~p", [Route#route.path]),
-			
-			Middlewares = get_route_middlewares(Route),
-			
-			%logger:debug("route mw ~p", [length(Middlewares)]),
+			Middlewares = Route#route.middlewares,
 			
 			RouteCtx = Ctx#ctx{ 				
-					route = Route
-					, req = Req#req{ params = Route#route.params } },
+					req = Req#req{ 
+						params = Route#route.params
+						, route = Route } },
 			
 			NewCtx = try
 				EnterCtx = dispatch_middwares(Middlewares, RouteCtx, enter),
@@ -213,8 +213,8 @@ dispatch_middwares([#middleware{} = Middleware|Middlewares], #ctx{req = Req, res
 					case Middleware#middleware.enter of
 						undefined -> undefined;
 						Func0 when is_function(Func0, 1) -> {Step, func, Func0};
-						Other0 -> 
-							logger:warning("Wrong middleware arity. Expected arity 1: ~p", [Other0]),
+						_ -> 
+							logger:warning("Wrong middleware arity. Expected arity 1: ~p, ~p", [enter, Middleware#middleware.enter]),
 							undefined
 					
 					end;
@@ -222,8 +222,8 @@ dispatch_middwares([#middleware{} = Middleware|Middlewares], #ctx{req = Req, res
 					case Middleware#middleware.leave of
 						undefined -> undefined;
 						Func0 when is_function(Func0, 2) -> {Step, func, Func0};
-						Other0 -> 
-							logger:warning("Wrong middleware arity. Expected arity 2: ~p", [Other0]),
+						_ -> 
+							logger:warning("Wrong middleware arity. Expected arity 2: ~p, ~p", [leave, Middleware#middleware.leave]),
 							undefined
 					end
 			end;
@@ -232,25 +232,25 @@ dispatch_middwares([#middleware{} = Middleware|Middlewares], #ctx{req = Req, res
 			
 			case lotus_ws_utils:find_module_fn(Mod, Func) of
 				{_, FnArity} when FnArity =:= ExpectedArity -> {Step, mod, {Mod, Func}};
-				Other1 -> 
-					logger:warning("Wrong middleware arity. Expected arity %v: ~p", [ExpectedArity ,Other1]),
+				_ -> 
+					logger:warning("Wrong middleware arity. Expected arity ~p: ~p:~p", [ExpectedArity , Mod, Func]),
 					undefined
 			end;
-		
 		
 		Mod when is_atom(Mod) -> 
 			%% Mod:(enter|leave)
 			
 			case lotus_ws_utils:find_module_fn(Mod, Step) of
 				{_, FnArity} when FnArity =:= ExpectedArity -> {Step, mod, {Mod, Step}};
-				Other2 -> 
-					logger:warning("Wrong middleware arity. Expected arity %v: ~p", [ExpectedArity ,Other2]),
+				false -> undefined;
+				_ -> 
+					logger:warning("Wrong middleware arity. Expected arity ~p: ~p:~p", [ExpectedArity, Mod, Step]),
 					undefined
 			end;
 		
-		Enter when Step =:= enter andalso is_function(Enter, 1) -> {enter, func, Enter};
+		Func when Step =:= enter andalso is_function(Func, 1) -> {enter, func, Func};
 		
-		Leave when Step =:= leave andalso is_function(Leave, 2) -> {leave, func, Leave};
+		Func when Step =:= leave andalso is_function(Func, 2) -> {leave, func, Func};
 		
 		Other ->
 			logger:warning("Wrong middleware: ~p", [Other]),
@@ -287,8 +287,7 @@ dispatch_middwares([#middleware{} = Middleware|Middlewares], #ctx{req = Req, res
 	end,
 	
 	NewCtx = case {Step, Result} of
-		undefined -> Ctx;
-		{_,undefined} -> Ctx;
+		{_, undefined} -> Ctx;
 		{enter, NewReq=#req{}} ->
 			Ctx#ctx { req = NewReq };
 		{enter, NewResp=#resp{}} ->
@@ -316,10 +315,3 @@ dispatch_request(Method, Route = #route{}, #ctx {req = #req{ headers = Headers }
 	end,
 	%logger:debug("handle Result = ~p", [Result]),
 	Result.
-
-
-get_route_middlewares(#route { middlewares = Handlers }) ->	
-	lists:map(fun(MD=#middleware{}) -> MD;			
-			({Type, Module, Func}) -> #middleware { handler = {Type, Module, Func} };
-			(Handler) when is_atom(Handlers) -> #middleware { handler = Handler}
-		end, Handlers).

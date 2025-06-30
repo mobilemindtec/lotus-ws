@@ -1,6 +1,6 @@
 -module(dummy_handler).
 
--include("include/lotus_ws.hrl").
+-include("../include/lotus_ws.hrl").
 
 -export([
 	get/2,

@@ -1,5 +1,5 @@
 -module(middleware_json_parse).
--include("include/lotus_ws.hrl").
+-include("../include/lotus_ws.hrl").
 
 %%
 %% Middleware to process json request and response
@@ -12,12 +12,12 @@
 error() -> {500, [{json, [{error, <<"invalid json data">>}]}]}.
 
 
-parse(Ctx, _, undefined) -> Ctx;
+parse(Req, _, undefined) -> Req;
 parse(_, false, _) -> error();
 parse(_, {incomplete, _}, _) -> error();
-parse(#ctx{ req = Req } = Ctx, true, Body) -> 
-	Ctx#ctx{ req = Req#req { body = lotus_ws_json:decode(Body)} }.
+parse(Req, true, Body) -> 
+	Req#req { body = lotus_ws_json:decode(Body)}.
 
-enter(#ctx{ req = #req { body = Body }} = Ctx) -> 
+enter(Req=#req { body = Body }) -> 
 	%?debugMsg("enter"),
-	parse(Ctx, jsx:is_json(Body), Body).	
+	parse(Req, jsx:is_json(Body), Body).	

@@ -1,5 +1,5 @@
 -module(middleware_bearer_token_render).
--include("include/lotus_ws.hrl").
+-include("../include/lotus_ws.hrl").
 
 %%
 %% Middleware to respond bearer token
@@ -25,7 +25,7 @@ get_config(Key, List) ->
 	Def = proplists:get_value(Key, default_configs()),
 	proplists:get_value(Key, List, Def).
 
-enter(#ctx{ req = #req { auth = Auth, body = #login{ username = Username } }}) -> 
+enter(#req { auth = Auth, body = #login{ username = Username } }) -> 
 	%?debugMsg("enter"),
 	Configs = lotus_ws_utils:get_env(bearer_token, default_configs()),
 	Key = get_config(key, Configs),
@@ -45,4 +45,4 @@ enter(#ctx{ req = #req { auth = Auth, body = #login{ username = Username } }}) -
 			],
 	{200, [{json, Data}]};
 
-enter(#ctx{}) -> unauthorized().
+enter(#req{}) -> unauthorized().
