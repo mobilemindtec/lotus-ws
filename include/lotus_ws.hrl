@@ -31,9 +31,9 @@
 -type req() :: #req{}.
 
 -record(resp, {
-		body :: any()
+		body = "" :: any()
 		, headers = #{} :: map()
-		, status :: integer()}).
+		, status  = 200:: integer()}).
 
 -type resp() :: #resp{}.
 
@@ -66,15 +66,17 @@
 		, path :: string()
 		, compiled_path :: string()
 		%% fun(req) -> res | tuple
+		%% fun(verb, req) -> res | tuple
 		%% module:verb(path, req) -> res | tuple
 		%% module:verb(req) -> res | tuple 
-		%% { verb, module, fun(path, req) -> res | tuple }
-		%% { verb, module, fun(req) -> res | tuple }
+		%% { module, fun(verb, path, req) -> res | tuple }
+		%% { module, fun(path, req) -> res | tuple }
+		%% { module, fun(req) -> res | tuple }
 		, handler = undefined ::  fun((req()) -> resp() | tuple()) | atom() | tuple() % {module,func}
-						%% module:enter(req) -> req | resp, 
-						%% module:leave(req, resp) -> resp, 
-						%% { enter, module, fun(req) -> req | resp }
-						%% { leave, module, fun(req, resp) -> resp }
+						%% module:enter(req) -> req | resp
+						%% module:leave(req, resp) -> resp
+						%% { module, fun(req) -> req | resp }
+						%% { module, fun(req, resp) -> resp }
 						%% middleware
 						, middlewares = [] :: list(atom() | tuple() | middleware())		
 						, roles = [] :: atom()

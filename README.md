@@ -1,239 +1,305 @@
 # lotus-ws
-ER lang web framework build on top cowboy
+
+Erlang  web framework build on top of Cowboy
 
 
-## Middlewares
 
-### Full middleware
+## Usage
+
+
+### Define routes and handler
+
 
 ```erl
--module(test_md).
 
--include_lib("lotus_ws/include/lotus_ws.hrl").
+%% api_routes.erl
+get_routes() ->
+	JsonHandler = [middleware_json_parse, middleware_json_format],
+	Routes = #{
+		debug => true
+		, interceptors => []
+		, recover => undefined
+		, routes => [  		
+			#{defaults => []
+				, path => "/api"
+				, routes => [
+					
+					#{path => "/healthcheck"
+						, handler => api_handler}
+					
+					,#{path => "/auth"
+						, middlewares => JsonHandler ++ [middleware_login_parse]
+						, handler => api_handler}									
+					
+					, #{path => "/register"
+						, middlewares => JsonHandler ++ [{enter, api_handler, auth_check}]
+						, handler => api_handler}
+					
+					, #{path => "/notify/:channel"
+						, middlewares => JsonHandler ++ [{enter, api_handler, auth_check}]
+						, handler => api_handler}
+					
+					, #{path => "/apps/register"
+						, middlewares => JsonHandler
+						, handler => api_handler}
+					]
+				}
+			]
+		}
 
--export([
-	enter/1,
-	leave/1,
-	error/1
-]).
+%% api_handler.erl
 
-enter(Ctx=#Ctx{}) -> Ctx.
-leave(Ctx=#Ctx{}) -> Ctx.
-error(Ctx=#Ctx{}) -> Ctx.
-```
-## Handler routers
+-export([post/2, get/2]).
 
-```erl
--module(test_ctrl).
--include_lib("lotus_ws/include/lotus_ws.hrl").
+auth_check(Ctx = #ctx{ req = #req{ headers = Headers } }) ->
+	case maps:get(<<"auhtorization">>, Headers) of
+		undefined ->
+			{401, {json, #{"message" => "Unauthorized"}}};
+		ApiKey ->			
+			% find by ApiKey			
+			Ctx
+	end.
 
--export([
-	get/1,
-	post/1,
-	put/1,
-	delete/1,
-	patch/1
-]).
-
-% route /my/route/:id([0-9])
-get('/my/route/:id', #ctx { req = #req { params = #{ "id" := Id } }}) ->
-	% id is integer
-	{ok, {json, []}}.
-
-% route /my/route/:name
-get('/my/route/:name', _, #req { params = #{ "name" := Id } }) ->
-	% name is string
-	{ok, {json, []}}.
-
-% use default middleware lotus_ws_body_json_parse_mw to receive body as map()
-post('/my/route', Ctx=#ctx{}, Req=req{}, Body) ->
-	{ok, {text, "ok"}}.
-```
-## Example
-
-### Routes configs 
-
-```erlang	
-%% lotus_ws_body_json_parse_mw and chat_token_resolver_mw are default middlewares
-
-get_routes() -> [  
-    #{path => "/healthcheck"
-    , handler => healthcheck_controller},
-
-    #{defaults => [bearer_token]
-    , path => "/api"
-    , routes => [
-        #{path => "/customer/:id([0-9])"
-        , handler => customer_controller}
-      , #{path => "/auth",
-          handler => login_controller
-        , middlewares => [login_controller]}
-      , #{path => "/message",
-          handler => message_controller
-        , middlewares => [lotus_ws_body_json_parse_mw, chat_token_resolver_mw, message_controller]
-        , routes => [
-            #{path => "/read"
-            , handler => message_controller,
-              middlewares => #{
-                ignore => [message_controller]
-              }},
-            #{path => "/received"
-            , handler => message_controller,
-              middlewares => #{
-                ignore => [message_controller]
-              }}
-          ]}]
-    }
-].   
-```
-### Start cowboy handler
-
-```erlang
-start(_StartType, _StartArgs) ->
-
-    RouterCfg = #{ routes => get_routes(), debug => true },
-
-    Dispatch = cowboy_router:compile(
-	[{'_', [
-	    {"/", cowboy_static, {priv_file, chat, "views/index.html"}},
-	    {"/healthcheck", lotus_ws_handler, []},
-	    {"/api/[...]", lotus_ws_handler, []},
-	    {"/[...]", cowboy_static, {priv_dir, chat, "./"}}
-	]}]
-    ),
-    {ok, _} = cowboy:start_clear(chat_listener, [{port, 8000}], #{env => #{dispatch => Dispatch}}),  
-```
-
-### Start router on app sup:
-
-```erlang
-init([DbConfig, RouterConfig]) ->
-    SupFlags = #{strategy => one_for_all,
-		 intensity => 20000,
-		 period => 5},
-    ChildSpecs = [
-      #{id => lotus_ws_router,
-	start => {lotus_ws_router, start_link, [RouterConfig]},
-	restart => permanent,
-	shutdown => brutal_kill,
-	type => worker,
-	modules => [lotus_ws_router]}  
-    ],
-    {ok, {SupFlags, ChildSpecs}}.	    
-```
-
-###  Controllers
-
-Example of controlles with handlers, middlewares and validations
-
-===============================================
-
-#### healthcheck_controller.erl
-
-```erlang	
--module(healthcheck_controller).
-
--export([get/2]).
-
-get("/healthcheck", _) ->
+get("/api/healthcheck", _) ->
 	{ok, {text, "alive"}}.
+
+post("/api/auth", #req{ body = #login{ username = UserName, password = Password }}) ->
+	if 
+		authenticate(UserName, Password) ->
+			{ok, {json, #{"message" => "auth success"}}};
+		true ->
+			{401, {json, #{"message" => "invalid username or password"}}}
+	end;
+
+post("/api/notify/:channel", #req{ params = #{ "channel" := Channel }, body = Body}) ->
+	{ok, {text, "notify"}};
+
+post("/api/register", Req=#req{ body = Body }) ->
+	{ok, {text, "register"}}.
+
 ```
 
-#### login_controller.erl
+### Start cowboy with lotus handler
 
-```erlang		
--module(login_controller).
-
--include_lib("lotus_ws/include/lotus_ws.hrl").
-
--export([
-	post/4,
-	enter/1
-]).
-
-rules() -> 
-	[lotus_ws_validator:new_rule(<<"username">>, [required]),
-	 lotus_ws_validator:new_rule(<<"password">>, [required])].	
-
-validate(#ctx{ req = #req{} = Req } = Ctx, JsonBody, ok) -> 
-	Ctx#ctx{ req = Req#req { body = JsonBody }  };
-validate(_, _, [{errors, _}] = Errors) -> 
-	{400, [{json, Errors}]};
-validate(Ctx, JsonBody, Rules) -> 
-	validate(Ctx, JsonBody, lotus_ws_validator:validate(JsonBody, Rules)).
-
-invalid_json() -> {500, [{json, [{error, <<"invalid body content">>}]}]}.
-unauthorized() -> {401, [{json, [{message, <<"unauthorized">>}]}]}.
-
-body_parse(Ctx, true, Body, Rules) -> validate(Ctx, jsx:decode(Body), Rules);
-body_parse(_, false, _, _) -> invalid_json();
-body_parse(_, {incomplete, _}, _, _) -> invalid_json().
-
-
-login_resp(unauthorized) -> unauthorized();
-login_resp(#muser{token = Token}) -> {200, [{json, [{token, Token}]}]};
-login_resp(norows) -> unauthorized();
-login_resp({error, Reason}) -> {500, [{json, [{message, Reason}]}]}.
-
-
-enter(#ctx{ req = #req{ body = Body } } = Ctx) ->	
-	body_parse(Ctx, jsx:is_json(Body), Body, rules()).
-
-post("/api/auth", _, _, Body) ->	
-	#{ <<"username">> := Username, <<"password">> := Password } = Body,
-	Result = auth_service:login(Username, Password),
-	login_resp(Result).
+```erlang
+start(_StartType, _StartArgs) ->  
+  Dispatch = cowboy_router:compile(
+		[{'_', [
+		    {"/", cowboy_static, {priv_file, chat, "views/index.html"}},
+		    {"/api/[...]", lotus_ws_handler, []},
+		    {"/[...]", cowboy_static, {priv_dir, chat, "./"}}
+		]}]),
+ 	{ok, _} = cowboy:start_clear(chat_listener, [{port, 8000}], #{env => #{dispatch => Dispatch}}),  
 ```
 
-#### messages_controller.erl
+### Start router:
 
-```erlang	
--module(chat_message_controller).
-
--include_lib("lotus_ws/include/lotus_ws.hrl").
-
--export([
-	enter/1,
-	leave/1,
-	post/2
-]).
-
-enter(#ctx{ req = #req { body = Body }} = Ctx) ->
-	validate(Ctx, Body).
-
-leave(#ctx{} = Ctx) ->
-	Ctx.
-
-get_user(#auth { data = #{ user := User }}) -> User.
-
-post("/api/message/read", #ctx{ req = #req { body = Body }}) ->
-	Ids = maps:get(<<"ids">>, Body, []),
-	 % update messages by ids..
-	{ok, #{json => #{ status => ok }}};
-
-post("/api/message/received", #ctx{ req = #req { body = Body }}) ->
-	Ids = maps:get(<<"ids">>, Body, []),
-	% update messages by ids..
-	{ok, #{json => #{ status => ok }}};
-
-post("/api/message", #ctx{ req = #req { body = Body }, auth = Auth }) ->
-
-	#{<<"limit">> := Limit
-	, <<"offset">> := Offset} = Body,
-
-	User = get_user(Auth),	% #muser{}
-	Messages = find_messages_by_user(User),
-	{200, [{json, Messages}]}.
-
-
-%% validations
-rules() -> [
-	, lotus_ws_validator:new_rule(<<"offset">>, #{required => true})
-	, lotus_ws_validator:new_rule(<<"limit">>, #{required => true})
-	].	
-
-validate(Ctx, JsonBody) -> validate(Ctx, JsonBody, rules()).
-validate(Ctx, _, ok) -> Ctx;
-validate(_, _, [{errors, _}] = Errors) -> {400, [{json, Errors}]};
-validate(Ctx, JsonBody, Rules) -> validate(Ctx, JsonBody, lotus_ws_validator:validate(JsonBody, Rules)).
+```erlang
+init([]) ->
+	Routes = api_routes:get_routes(),
+  SupFlags = #{ 
+  	strategy => one_for_all,
+	 	intensity => 20000,
+	 	period => 5},
+  ChildSpecs = [
+      #{id => lotus_ws_router,
+				start => {lotus_ws_router, start_link, [Routes]},
+				restart => permanent,
+				shutdown => brutal_kill,
+				type => worker,
+				modules => [lotus_ws_router]}  
+  ],
+  {ok, {SupFlags, ChildSpecs}}.	    
 ```
+
+## Details
+
+### Router handler
+
+
+Handle with module and custom function
+
+
+```erl
+
+%% route
+
+#{path => "/my-path"
+, handler => {mymodule, myfunc}}
+
+%% mymodule
+-module(mymodule).
+
+myfunc(get, "/my-path", #req{}) -> {ok, {text, "ok"}}.
+
+%% or
+
+myfunc("/my-path", #req{}) -> {ok, {text, "ok"}}.
+
+%% or
+
+myfunc(get, "/my-path", #req{}) -> {ok, {text, "ok"}}.
+
+```
+
+Handle with module with default names (get, post, put, delete, etc..). 
+
+
+```erl
+
+%% route
+
+#{path => "/my-path/:id"
+, handler => mymodule}
+
+%% mymodule
+
+-module(mymodule).
+
+get("/my-path/:id", #req{params = #{"id" := Id}}) -> #resp{}.
+post("/my-path/:id", #req{params = #{"id" := Id}, body = Body}) -> #resp{}.
+
+%% or
+
+get(#req{}) -> #resp{}.
+post(#req{}) -> #resp{}.
+
+```
+
+Using function
+
+
+```erl
+
+#{path => "/my-path"
+, handler => fun(#req{}) -> #resp{} end }
+
+```
+
+```erl
+#{path => "/my-path"
+, handler => fun(get, #req{}) -> {ok, {text, "my response"}} end }
+```
+
+### Router middleware
+
+The middleware can be the enter or leave function.
+
+Enter function receive a `#req` as argument and can return 
+a `#req{}` to continue request or a `#resp{}` to terminate request. 
+
+Leave function receive a `#req{}` and `#resp{}` arguments should responds with a `#resp{}`.
+
+
+Middleware with module and custom function
+
+
+```erl
+#{path => "/my-path"
+, handler => fun(#req{}) -> {ok, {text, "my response"}} end
+, middleware => [{mymodule, myenterfunc}, {mymodule, myleavefunc}] }
+
+%% mymodule
+module(mymodule).
+myenterfunc(#req{}) -> #req{} | #resp{}. %enter
+myleavefunc(#req{}, #resp{}) -> #resp{}. %leave
+
+```
+
+Middleware with module with default enter/leave function
+
+
+```erl
+#{path => "/my-path"
+, handler => fun(#req{}) -> {ok, {text, "my response"}} end
+, middleware => [mymodule] }
+
+%% mymodule
+module(mymodule).
+enter(#req{}) -> #req{} | #resp{}.
+leave(#req{}, #resp{}) -> #resp{}.
+
+```
+
+Middleware with functions
+
+
+```erl
+#{path => "/my-path"
+, handler => fun(#req{}) -> {ok, {text, "my response"}} end
+, middleware => [
+		fun(#req{}) -> #req{} | #resp{} end % enter
+	, fun(#req{}, #resp{}) -> #resp{} end % leave
+	]}
+```
+
+Middleware with record
+
+
+```erl
+#{path => "/my-path"
+, handler => fun(#req{}) -> {ok, {text, "my response"}} end
+, middleware => #middleware {
+		enter = fun(#req{}) #req{} | #resp{} end
+	, leave = fun(#req{}, #resp{}) #resp{} end
+}}
+```
+
+### Response
+
+```erl
+
+%% 200 text/plain
+{ok, {text, "text"}}
+
+%% 200 application/json
+{ok, {json, [{"id", 1}, {"name", "Ricardo"}]}}
+
+%% 200 application/json
+{ok, {json, #{ "id" => 1, "name" => "Ricardo"}}}
+
+%% 200 text/plain
+{200, {text, "text"}}
+
+%% 404 text/plain
+{404, {text, "not found"}}
+
+%% 404 text/plain
+{not_found, {text, "not found"}}
+
+%% 404 text/plain
+#resp { 
+		status = 404
+	, body = "not found"
+	, headers = #{ "content-type" => "text/plain"}
+}
+
+```
+
+### Request 
+
+```erl
+
+-record(req, {
+		body :: any()
+		, path :: string()
+		, method :: atom() % get, post, put, delete, patch			
+		, headers = #{} :: map()	
+		, params = #{} :: map()
+		, queries = #{} :: map()
+		, auth = #auth{} :: auth()
+		, data = #{} :: map()
+		, req :: cowboy_req:req()
+		, route :: route()
+		}).
+
+
+```
+
+### Default middlewares
+
+* middleware_bearer_auth
+* middleware_bearer_render
+* middleware_json_format
+* middleware_json_parse
+* middleware_login_parse

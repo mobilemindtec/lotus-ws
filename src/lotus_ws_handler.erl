@@ -161,25 +161,25 @@ dispatch_recover(Other, Req=#req{}, _) ->
 	logger:warning("Invalid recover handler: ~p", [Other]),
 	Req.
 
-find_http_handler(Method, #route { handler  = Handler }) ->
-	
+find_http_handler(Verb, #route { handler  = Handler }) ->
 	
 	case Handler of
 		{Module, Func} ->  % Module:Func
 			
+			%% func(verb, path, req) | func(path, req) | func(req)
 			case lotus_ws_utils:find_module_fn(Module, Func) of
-				{_, Arity} when Arity >= 1, Arity =< 2 -> 					
+				{_, Arity} when Arity >= 1, Arity =< 3 -> 					
 					{mod, Arity, {Module, Func}};
 				_ -> 
-					logger:warning("Wrong http handler arity. Expected arity 1 or 2. Module: ~p:~p", [Module, Func]),
+					logger:warning("Wrong http handler arity. Expected arity 1, 2 or 3. Module: ~p:~p", [Module, Func]),
 					undefined
 			end;
 		
-		Module when is_atom(Module) -> % Module:get
+		Module when is_atom(Module) -> % module:verb
 			
-			case lotus_ws_utils:find_module_fn(Module, Method) of
+			case lotus_ws_utils:find_module_fn(Module, Verb) of
 				{_, Arity} when Arity >= 1, Arity =< 2 -> 
-					{mod, Arity, {Module, Method}};
+					{mod, Arity, {Module, Verb}};
 				_ -> 
 					logger:warning("Wrong http handler arity. Expected arity 1 or 2. Module: ~p:~p", [Module, Method]),
 					undefined
@@ -188,9 +188,11 @@ find_http_handler(Method, #route { handler  = Handler }) ->
 		Func when is_function(Func) -> 
 			
 			if
+				%% func(verb, req) | func(req)
 				is_function(Func, 1) -> {func, 1, Func};
+				is_function(Func, 2) -> {func, 2, Func};
 				true -> 
-					logger:warning("Wrong http handler arity. Expected arity 1. Func: ~p", [Func]),
+					logger:warning("Wrong http handler arity. Expected arity 1 or 2. Func: ~p", [Func]),
 					undefined
 			end;
 		
@@ -228,7 +230,10 @@ dispatch_middwares([#middleware{} = Middleware|Middlewares], #ctx{req = Req, res
 					end
 			end;
 		
-		{Type, Mod, Func} when Type =:= Step -> 
+		{Mod, Func} -> 
+			
+			%% fun(req) -> req | resp
+			%% fun(req, resp) -> resp
 			
 			case lotus_ws_utils:find_module_fn(Mod, Func) of
 				{_, FnArity} when FnArity =:= ExpectedArity -> {Step, mod, {Mod, Func}};
@@ -301,17 +306,19 @@ dispatch_middwares([#middleware{} = Middleware|Middlewares], #ctx{req = Req, res
 	
 	dispatch_middwares(Middlewares, NewCtx, Step).
 
-dispatch_request(Method, Route = #route{}, #ctx {req = #req{ headers = Headers } = Req}) when is_atom(Method) -> 
-	Handler = find_http_handler(Method, Route),	
+dispatch_request(Verb, Route = #route{}, #ctx {req = #req{ headers = Headers } = Req}) when is_atom(Verb) -> 
+	Handler = find_http_handler(Verb, Route),	
 	RoutePath = Route#route.compiled_path,
 	Result = case Handler of
 		{error, Reason} ->
 			lotus_ws_http_utils:server_error(Headers, Reason);
 		undefined ->
 			lotus_ws_http_utils:not_found(Headers);
-		{mod, 2, {Mod, Func}} -> Mod:Func(RoutePath, Req);
 		{mod, 1, {Mod, Func}} -> Mod:Func(Req);
-		{func, _, Func} -> Func(Req)
+		{mod, 2, {Mod, Func}} -> Mod:Func(RoutePath, Req);
+		{mod, 3, {Mod, Func}} -> Mod:Func(Verb, RoutePath, Req);
+		{func, 1, Func} -> Func(Req);
+		{func, 2, Func} -> Func(Verb, Req)
 	end,
 	%logger:debug("handle Result = ~p", [Result]),
 	Result.
