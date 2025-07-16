@@ -181,7 +181,7 @@ find_http_handler(Verb, #route { handler  = Handler }) ->
 				{_, Arity} when Arity >= 1, Arity =< 2 -> 
 					{mod, Arity, {Module, Verb}};
 				_ -> 
-					logger:warning("Wrong http handler arity. Expected arity 1 or 2. Module: ~p:~p", [Module, Method]),
+					logger:warning("Wrong http handler arity. Expected arity 1 or 2. Module: ~p:~p", [Module, Verb]),
 					undefined
 			end;
 		

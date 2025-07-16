@@ -137,7 +137,9 @@ handle_call(Event, _From, State) ->
 prepare_middlewares(Middlewares) ->
 	lists:map(
 		fun(MD=#middleware{}) -> MD;			
-			({Type, Module, Func}) -> #middleware { handler = {Type, Module, Func} };
+			({Module, Func}) -> #middleware { handler = {Module, Func} };
+			(Handler) when is_function(Handler, 1) -> #middleware { enter = Handler };
+			(Handler) when is_function(Handler, 2) -> #middleware { leave = Handler }; 
 			(Handler) when is_atom(Handler) -> #middleware { handler = Handler};
 			(Handler) -> throw(lotus_ws_utils:format("Invalid middleware handler: ~p", [Handler])) 
 		end, 

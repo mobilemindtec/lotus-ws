@@ -176,6 +176,8 @@ Using function
 
 ```
 
+or 
+
 ```erl
 #{path => "/my-path"
 , handler => fun(get, #req{}) -> {ok, {text, "my response"}} end }
@@ -230,7 +232,7 @@ Middleware with functions
 , middleware => [
 		fun(#req{}) -> #req{} | #resp{} end % enter
 	, fun(#req{}, #resp{}) -> #resp{} end % leave
-	]}
+]}
 ```
 
 Middleware with record
@@ -244,6 +246,96 @@ Middleware with record
 	, leave = fun(#req{}, #resp{}) #resp{} end
 }}
 ```
+
+### Interceptors
+
+An interceptor is called at the end of route processing for a given status code.
+
+Interceptor with function
+
+```erl
+#{
+	interceptors = [
+		fun(404, #req{}, #resp{}) -> #resp{} end
+	]	
+}
+```
+
+Interceptor with module and custom function
+
+```erl
+#{
+	interceptors = [
+		{404, myinterceptor, not_found}
+	]	
+}
+
+%% myinterceptor
+-module(myinterceptor).
+
+not_found(#req{}, #resp{}) -> #resp{}.
+
+```
+
+
+Interceptor with default module
+
+```erl
+#{
+	interceptors = [
+		myinterceptor
+	]	
+}
+
+%% myinterceptor
+-module(myinterceptor).
+
+intercept(404, #req{}, #resp{}) -> #resp{}.
+
+```
+
+### Recover
+
+Recover is called in case an exception occurs.
+
+
+Recover with function
+
+```erl
+#{
+	recover = fun(#req{}, Error) -> #resp{} end
+}
+```
+
+Recover with module and custom function
+
+```erl
+#{
+	recover = {myrecover, myrecoverfn}
+}
+
+%% myrecover
+-module(myrecover).
+
+myrecoverfn(#req{}, Error) -> #resp{}.
+
+```
+
+
+Recover with default module
+
+```erl
+#{
+	recover = myrecover	
+}
+
+%% myrecover
+-module(myrecover).
+
+recover(#req{}, Error) -> #resp{}.
+
+```
+
 
 ### Response
 
